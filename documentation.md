@@ -608,12 +608,13 @@ okna, nikoli parseru.
 Výška se při každém vytvoření okna aktivně vypočítá:
 
 ```text
-min(1084, max(640, výška pracovní plochy - 24))
+min(1163, max(640, výška pracovní plochy - 24))     rozbalené
+min(879,  max(640, výška pracovní plochy - 24))     sbalené
 ```
 
-Šířka je 440 a minimální šířka 390. Hodnota 1084 je návrhová výška, do které se vejde
-nejhorší možný obsah: osm hráčů lobby, sedm minionů vlastní desky a sedm karet v nabídce
-Boba nebo na desce soupeře.
+Šířka je 440 a minimální šířka 390. Návrhové výšky pokrývají nejhorší možný obsah:
+osm hráčů lobby, sedm minionů vlastní desky, sedm karet v nabídce Boba nebo na desce
+soupeře a šest posledních událostí.
 
 Seznamy lobby, desky a nabídky jsou `ItemsControl`, nikoli `ListBox`, takže scrollovat
 principiálně nemohou. Místo pro maximální počet položek si rezervují napevno přes
@@ -622,11 +623,11 @@ principiálně nemohou. Místo pro maximální počet položek si rezervují nap
 Jediný scrollovatelný panel je `POSLEDNÍ UDÁLOSTI`. Ten zůstává interaktivní, aby v něm
 fungovalo kolečko myši i tažení scrollbaru.
 
-Návrhová výška 1084 se ale nevejde na monitor s rozlišením 1920×1080, kde po odečtení
-hlavního panelu zbývá kolem 1010 bodů. Proto jde sekce s deskami sbalit klikem na její
-nadpis; okno se tím zmenší zhruba o 288 bodů na 796. **Když je při startu k dispozici
-méně místa, než potřebuje plné rozložení, sekce se sbalí sama**, aby uživatel nepřišel
-o spodek okna s ovládacími tlačítky.
+Rozložení má dvě návrhové výšky: 1163 bodů s rozbalenými deskami a 879 se sbalenými.
+Ta první se nevejde na monitor s rozlišením 1920×1080, kde po odečtení hlavního panelu
+zbývá kolem 1010 bodů. Proto jde sekce s deskami sbalit klikem na její nadpis.
+**Když je při startu k dispozici méně místa, než potřebuje plné rozložení, sekce se sbalí
+sama**, aby uživatel nepřišel o spodek okna s ovládacími tlačítky.
 
 ### 11.3 Obsah
 
@@ -664,8 +665,8 @@ Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku z
 to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
 
 Panel `POSLEDNÍ UDÁLOSTI` zobrazuje události od nejnovější po nejstarší. `TrackerState`
-uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je nižší
-než šest řádků, proto se v něm scrolluje.
+uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je na
+šest řádků navržený, takže se scrollbar objeví jen u delších zalomených textů.
 
 Dolní část obsahuje stav, výsledek, diagnostiku počtu zpracovaných řádků a rozpoznaných
 událostí a tlačítka:

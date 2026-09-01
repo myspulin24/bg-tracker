@@ -18,10 +18,10 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Výška, na kterou je rozložení navržené, aby se žádný panel nemusel scrollovat.</summary>
-    private const double DesignHeight = 1084;
+    private const double ExpandedDesignHeight = 1163;
 
-    /// <summary>Kolik výšky ušetří sbalení sekce s deskami.</summary>
-    private const double BoardsHeight = 288;
+    /// <summary>Táž výška se sbalenou sekcí desek.</summary>
+    private const double CollapsedDesignHeight = 879;
 
     /// <summary>Jak často se v živém režimu ověří, jestli hra nezaložila nový session log.</summary>
     private const int LiveDiscoveryIntervalTicks = 15;
@@ -33,7 +33,7 @@ public partial class MainWindow : Window
     private PowerLogTailReader? liveReader;
     private MatchLogArchive? matchArchive;
     private int demoIndex;
-    private double expandedHeight = DesignHeight;
+    private double expandedHeight = ExpandedDesignHeight;
     private double expandedMinHeight = 640;
     private bool isCollapsed;
     private bool isReading;
@@ -46,10 +46,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        // Na monitoru, kam se plné rozložení nevejde, se desky rovnou sbalí. Jinak by uživatel
+        // Na monitoru, kam se plné rozložení nevejde, se desky sbalí rovnou. Jinak by uživatel
         // přišel o spodek okna včetně ovládacích tlačítek.
-        var available = SystemParameters.WorkArea.Height - 24;
-        SetBoardsVisible(available >= DesignHeight);
+        SetBoardsVisible(SystemParameters.WorkArea.Height - 24 >= ExpandedDesignHeight);
         DataContext = viewModel;
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
@@ -69,10 +68,20 @@ public partial class MainWindow : Window
         BoardsContent.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         BoardsChevron.Text = visible ? "▾" : "▸";
         BoardsHeader.Text = visible ? "MOJE DESKA" : "DESKY (skryto)";
+        UpdateWindowHeight();
+    }
 
-        var wanted = visible ? DesignHeight : DesignHeight - BoardsHeight;
+    /// <summary>
+    /// Nastaví výšku okna podle toho, jestli je sekce desek rozbalená, a omezí ji pracovní
+    /// plochou. Návrhové výšky odpovídají obsahu, takže nezbývá prázdné místo ani se nic neořízne.
+    /// </summary>
+    private void UpdateWindowHeight()
+    {
+        var wanted = BoardsContent.Visibility == Visibility.Visible
+            ? ExpandedDesignHeight
+            : CollapsedDesignHeight;
         var available = SystemParameters.WorkArea.Height - 24;
-        expandedHeight = Math.Min(wanted, Math.Max(MinHeight, available));
+        expandedHeight = Math.Max(MinHeight, Math.Min(wanted, available));
         if (!isCollapsed)
         {
             Height = expandedHeight;

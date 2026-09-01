@@ -113,7 +113,8 @@
                     <RowDefinition Height="9" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="9" />
-                    <RowDefinition Height="*" MinHeight="92" />
+                    <!-- Rezervuje šest řádků událostí; víc místa dostane, když okno zvětšíte. -->
+                    <RowDefinition Height="*" MinHeight="159" />
                     <RowDefinition Height="9" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
