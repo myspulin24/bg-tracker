@@ -7,24 +7,25 @@ using Tracker.Core;
 namespace Tracker.Desktop;
 
 /// <summary>
-/// Mapuje ID karty na <see cref="CardArt"/> a stará se o načtení obrázku na pozadí. Volá se
+/// Mapuje Card ID na <see cref="CardInfo"/> a na pozadí k němu dohraje kresbu i popis. Volá se
 /// z vlákna rozhraní při skládání modelu pohledu, proto tabulka nepotřebuje zámek.
 /// </summary>
-public sealed class CardArtCache(CardArtProvider provider)
+public sealed class CardCache(CardArtProvider art, CardTextProvider texts)
 {
-    private readonly Dictionary<string, CardArt> entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CardInfo> entries = new(StringComparer.OrdinalIgnoreCase);
+
     // Dispečer aplikace, ne aktuálního vlákna: sdílená instance vzniká při prvním dotazu a ten
     // nemusí přijít z vlákna rozhraní.
     private readonly Dispatcher dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
 
-    /// <summary>Sdílená instance pro celé okno; kresby se tak stahují jednou za běh aplikace.</summary>
-    public static CardArtCache Shared { get; } = new(new CardArtProvider());
+    /// <summary>Sdílená instance pro celé okno; data se tak stahují jednou za běh aplikace.</summary>
+    public static CardCache Shared { get; } = new(new CardArtProvider(), new CardTextProvider());
 
     /// <summary>
-    /// Vrátí držák kresby pro danou kartu a při prvním dotazu spustí stahování. Vrací vždy stejnou
+    /// Vrátí držák dat pro danou kartu a při prvním dotazu spustí stahování. Vrací vždy stejnou
     /// instanci, aby porovnání modelů pohledu zůstalo stabilní.
     /// </summary>
-    public CardArt? Get(string? cardId)
+    public CardInfo? Get(string? cardId)
     {
         if (string.IsNullOrWhiteSpace(cardId))
         {
@@ -36,21 +37,34 @@ public sealed class CardArtCache(CardArtProvider provider)
             return existing;
         }
 
-        var art = new CardArt();
-        entries[cardId] = art;
-        _ = FillAsync(cardId, art);
-        return art;
+        var info = new CardInfo();
+        entries[cardId] = info;
+        _ = FillArtAsync(cardId, info);
+        _ = FillTextAsync(cardId, info);
+        return info;
     }
 
-    private async Task FillAsync(string cardId, CardArt art)
+    private async Task FillArtAsync(string cardId, CardInfo info)
     {
-        var path = await provider.GetAsync(cardId).ConfigureAwait(false);
+        var path = await art.GetAsync(cardId).ConfigureAwait(false);
         if (path is null || Decode(path) is not { } image)
         {
             return;
         }
 
-        await dispatcher.InvokeAsync(() => art.Image = image);
+        await dispatcher.InvokeAsync(() => info.Image = image);
+    }
+
+    private async Task FillTextAsync(string cardId, CardInfo info)
+    {
+        // Databáze se stahuje celá a jen jednou; každá další karta už jen sáhne do hotové tabulky.
+        var database = await texts.LoadAsync().ConfigureAwait(false);
+        if (!database.TryGetValue(cardId, out var text))
+        {
+            return;
+        }
+
+        await dispatcher.InvokeAsync(() => info.Text = text);
     }
 
     /// <summary>
@@ -64,7 +78,6 @@ public sealed class CardArtCache(CardArtProvider provider)
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
-            image.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
             image.UriSource = new Uri(path);
             image.EndInit();
             image.Freeze();

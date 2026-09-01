@@ -56,7 +56,7 @@ projít bez varování.
 
 | Projekt / cesta | Odpovědnost |
 | --- | --- |
-| `src/Tracker.Core` | Parser `Power.log`, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb karet. |
+| `src/Tracker.Core` | Parser `Power.log`, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb a popisů karet. |
 | `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly a ovládání okna. |
 | `src/Tracker.App` | Původní konzolová varianta, replay a textový dashboard. |
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
@@ -523,10 +523,12 @@ hry.
   cardart\
     BG31_035.jpg
     ...
+  cards\
+    cardtext.json
 ```
 
-Složka `cardart` je jen mezipaměť obrázků podle kapitoly 11.6. Smazat se dá kdykoli;
-aplikace si potřebné kresby stáhne znovu.
+Složky `cardart` a `cards` jsou jen mezipaměti podle kapitoly 11.6. Smazat se dají kdykoli;
+aplikace si kresby i popisy stáhne znovu.
 
 Přípona s pořadovým číslem se použije pouze při kolizi časového názvu. Soubory obsahují
 původní řádky `Power.log` náležející zápasu. Proto mohou obsahovat BattleTagy a další
@@ -705,14 +707,22 @@ Styly scrollbarů jsou definované v `Tracker.Desktop/App.xaml`. Používají vl
 pozadí, zaoblený thumb a barvy sladěné s kartami overlaye. Nativní světlý scrollbar se
 proto v panelu událostí nepoužívá.
 
-### 11.6 Kartičky minionů a kresby karet
+### 11.6 Kartičky minionů, kresby a popisy karet
 
-Kartička je `MinionCardTemplate` v `MainWindow.xaml`, 98 × 140 bodů. Kresba karty tvoří
-pozadí, přes spodní polovinu leží přechod do skoro černé a v něm jsou všechny údaje:
-tavern tier v odznaku vlevo nahoře, hvězdička u zlaté karty vpravo nahoře, jméno,
-klíčová slova a dole útok u ikony meče a život u ikony srdce. Protože karta nese kompletní
-informaci sama, skládají se karty vedle sebe do `WrapPanel`; šířka seznamu je nastavená
-přesně na sedm karet, což je maximum na desce v Battlegrounds.
+Kartička je `MinionCardTemplate` v `MainWindow.xaml`, 148 × 214 bodů, a napodobuje kartu ze
+hry: kresba je vystřižená do oválu s kovovým prstencem, takže kolem ní nezůstane obdélníkové
+pozadí. Vlevo nahoře přes okraj portrétu leží štít s tavern tierem, vpravo nahoře hvězdička
+u zlaté karty. Pod portrétem je jmenná páska, pod ní rámeček s klíčovými slovy a popisem
+efektu, na jeho spodní hraně sedí páska s typem minionu a v dolních rozích jsou drahokamy
+s útokem a životem. Čísla jsou v `Viewbox`, takže se i čtyřmístné hodnoty zmenší tak, aby se
+do drahokamu vešly. Zlatá karta má zlatý prstenec i rámeček místo ocelového.
+
+Karta má vlastní tmavý podklad. Bez něj se v řadě slily a nešlo poznat, ke které kartě patří
+který drahokam. Skládají se do `WrapPanel`; šířka seznamu je nastavená přesně na sedm karet,
+což je maximum na desce v Battlegrounds. Po najetí myší na řádek desky v okně se tatáž
+šablona ukáže zvětšená transformací.
+
+#### Kresba
 
 Kresby nejde brát z instalace hry. Obrázky leží v `Data\Win\*.unity3d`, což je zhruba 12 GB
 Unity asset bundlů; jejich čtení by vyžadovalo zvláštní parser, po každém patchi by se
@@ -723,12 +733,17 @@ repozitáři. Kresba se proto stahuje z veřejné CDN HearthstoneJSON:
 https://art.hearthstonejson.com/v1/256x/{CardID}.jpg
 ```
 
-Hotové renderované karty (`/v1/render/latest/enUS/256x/`) tatáž CDN sice nabízí, ale jen
-zhruba do setu BG29; z měřeného vzorku čtyřiceti Card ID z reálných logů jich mělo render
-patnáct, kdežto kresbu třicet sedm. Ty tři chybějící byly enchanty a pomocná karta
-`TB_BaconShop_DragSell`, které se na desce nikdy nezobrazí. Kreslit rámeček a čísla vlastní
-šablonou je navíc přesnější: hotový render nese základní statistiky karty, kdežto tracker
-zná ty skutečné, nabuffované.
+Hotové renderované karty s průhledným pozadím by ušetřily veškeré kreslení, ale žádný
+veřejný zdroj je pro aktuální sety nemá. `art.hearthstonejson.com/v1/render/…` končí zhruba
+u setu BG29: z měřeného vzorku čtyřiceti Card ID z reálných logů mělo render patnáct, kdežto
+kresbu třicet sedm. Ty tři chybějící byly enchanty a pomocná karta `TB_BaconShop_DragSell`,
+které se na desce nikdy nezobrazí. Prověřené a nefunkční alternativy: `static.zerotoheroes.com`
+má jen `cardart`, `static.hsreplay.net` rendery nemá a oficiální knihovna karet Blizzardu
+plní obrázky až v prohlížeči a k obrázkům přes `d15f34w2p8l1cc.cloudfront.net` je potřeba
+OAuth, který by musel nastavovat každý uživatel zvlášť.
+
+Kreslit rámeček a čísla vlastní šablonou má navíc jednu výhodu, kterou by hotový render
+nedal: render nese základní statistiky karty, kdežto tracker zná ty skutečné, nabuffované.
 
 `CardArtProvider` v `Tracker.Core` řeší stahování a mezipaměť:
 
@@ -741,15 +756,43 @@ zná ty skutečné, nabuffované.
   zapomene, aby si aplikace o kresbu řekla znovu, až bude připojení zpátky;
 - jméno souboru vzniká z Card ID, proto se přijímají jen písmena, číslice a podtržítko.
 
-`CardArtCache` v `Tracker.Desktop` mapuje Card ID na `CardArt`, což je držák jednoho
-`ImageSource` s `INotifyPropertyChanged`. Pro každé Card ID existuje jediná instance, takže
-model pohledu zůstane při porovnání stejný a doplnění obrázku nepřestaví celý seznam ani
-nezavře otevřené podokno. Obrázek se dekóduje na pozadí s `BitmapCacheOption.OnLoad`
-a zmrazí, aby šel předat do vlákna rozhraní.
+#### Popis efektu
 
-Kresba se vyžádá už při složení modelu pohledu, ne až při najetí myší. Než uživatel na
-řádek najede, je obrázek zpravidla stažený. Když se stáhnout nepodaří, kartička se vykreslí
-na tmavém podkladu a všechny textové údaje zůstanou čitelné.
+Log nese jen Card ID a statistiky, žádný text. `CardTextProvider` proto stáhne databázi
+karet HearthstoneJSON:
+
+```text
+https://api.hearthstonejson.com/v1/latest/enUS/cards.json
+```
+
+Ta má přes devět megabajtů nekomprimovaně a čte se proudem přes
+`JsonSerializer.DeserializeAsyncEnumerable`, aby se celá nemusela materializovat v paměti.
+Uloží se z ní jen dvojice Card ID a text pro karty s prefixem `BG` nebo `TB_Bacon`, což je
+zhruba 4 500 karet a 360 kB v souboru
+`%LOCALAPPDATA%\BattlegroundsTracker\cards\cardtext.json`. Po čtrnácti dnech se databáze
+stáhne znovu; při výpadku sítě se použije i prošlá kopie, protože starý popis je pořád lepší
+než žádný.
+
+Na rozdíl od renderů je pokrytí textů úplné: ze 636 unikátních Card ID ve čtyřech reálných
+zápasech byla v databázi všechna a 573 z nich mělo text. Zbylých 63 jsou vanilla minioni
+a tokeny, které popis nemají ani ve hře.
+
+`CardTextProvider.Clean` odstraní značky, kterými databáze řídí sazbu v klientu hry: úvodní
+`[x]`, ruční zalomení řádků, jednoduché HTML a mřížky před čísly poškození. Z
+`"[x]<b>Battlecry:</b> Deal $3\ndamage."` tak zbude `Battlecry: Deal 3 damage.`, které se
+v kartičce zalomí samo podle šířky.
+
+#### Sdílený držák
+
+`CardCache` v `Tracker.Desktop` mapuje Card ID na `CardInfo`, což je držák kresby i popisu
+s `INotifyPropertyChanged`. Pro každé Card ID existuje jediná instance, takže model pohledu
+zůstane při porovnání stejný a doplnění dat nepřestaví celý seznam ani nezavře otevřené
+podokno. Obrázek se dekóduje na pozadí s `BitmapCacheOption.OnLoad` a zmrazí, aby šel předat
+do vlákna rozhraní.
+
+Obojí se vyžádá už při složení modelu pohledu, ne až při najetí myší. Než uživatel na řádek
+najede, jsou data zpravidla stažená. Když se stáhnout nepodaří, kartička se vykreslí na
+tmavém podkladu, popis se vynechá a všechny ostatní údaje zůstanou čitelné.
 
 ## 12. Konzolová aplikace
 
@@ -903,7 +946,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje dvacet dva testů.
+Test suite aktuálně obsahuje třicet jedna testů.
 
 Původní čtyři:
 
@@ -946,7 +989,11 @@ Tři v `CardArtTests` pokrývají mezipaměť kreseb:
 22. Opakování pokusu po výpadku sítě a odmítnutí Card ID, které by se nemělo dostat do
     cesty na disku ani do adresy.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 22 testů prošlo.
+Devět v `CardTextTests` pokrývá popisy karet: šest případů úklidu značek pro sazbu, výběr
+jen battlegroundských karet s textem, čtení uložené kopie místo dalšího stahování a použití
+i prošlé kopie, když se stažení nepovede.
+
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 31 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1016,13 +1063,17 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
     startu, ruční volba se ale mezi spuštěními neukládá.
 19. **Soukromí logů.** Vlastní archivy mohou obsahovat BattleTagy a další syrová data;
     nemají se automaticky sdílet bez kontroly.
-20. **Kresby karet potřebují internet.** Aplikace kvůli nim chodí na cizí CDN
-    (`art.hearthstonejson.com`). Neposílá o uživateli nic než Card ID a `User-Agent`, ale
-    je to druhé místo po kontrole aktualizací, kde tracker sahá ven. Bez sítě a bez už
-    naplněné mezipaměti se kartičky vykreslí jen s texty.
-21. **Kresba nemusí existovat.** CDN je nezávislá na Blizzardu a u čerstvě vydaných karet
-    může chybět. Kartička to snese, ale obrázek prostě nebude.
-22. **Dekódované obrázky se z paměti neuvolňují.** `CardArtCache` je drží po celý běh
+20. **Kresby a popisy karet potřebují internet.** Aplikace kvůli nim chodí na cizí servery
+    (`art.hearthstonejson.com` a `api.hearthstonejson.com`). Neposílá o uživateli nic než
+    Card ID a `User-Agent`, ale je to druhé místo po kontrole aktualizací, kde tracker sahá
+    ven. Bez sítě a bez naplněné mezipaměti se kartičky vykreslí jen s údaji z logu.
+21. **Kresba nebo popis nemusí existovat.** Zdroj je nezávislý na Blizzardu a u čerstvě
+    vydaných karet může zaostávat. Kartička to snese, jen bude bez obrázku nebo bez popisu.
+    Popisy jsou navíc jen anglicky; databáze má i jiné jazyky, ale tracker si bere `enUS`.
+22. **Popis je z databáze, ne z rozehrané partie.** Ukazuje text vytištěný na kartě.
+    Nezohledňuje, co s minionem udělaly buffy nebo trinkety; skutečné jsou jen statistiky
+    a klíčová slova, které tracker čte z logu.
+23. **Dekódované obrázky se z paměti neuvolňují.** `CardCache` je drží po celý běh
     aplikace. Jedna kresba zabere zhruba 260 kB, takže dlouhá relace s mnoha různými
     kartami paměť pozvolna zvedá.
 

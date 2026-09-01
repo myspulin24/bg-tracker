@@ -9,12 +9,16 @@ public sealed record MinionViewModel(
     string Health,
     string Tier,
     string Keywords,
+    string Race,
     bool IsGolden,
     string Detail,
-    CardArt? Art)
+    CardInfo? Card)
 {
-    /// <summary>Řádek klíčových slov na kartičce zabírá místo, tak se u karty bez nich vynechá.</summary>
+    /// <summary>Klíčová slova se na kartičce ukazují jen tehdy, když nějaká jsou.</summary>
     public bool HasKeywords => Keywords.Length > 0;
+
+    /// <summary>Typ minionu se na kartičce ukazuje v pásce dole, jako ve hře.</summary>
+    public bool HasRace => Race.Length > 0;
 
     public static MinionViewModel From(BoardMinion minion) => new(
         minion.ZonePosition.ToString(),
@@ -23,33 +27,8 @@ public sealed record MinionViewModel(
         minion.Health?.ToString() ?? "—",
         minion.TechLevel?.ToString() ?? "—",
         minion.Keywords,
+        minion.Race is { } race ? MinionRace.Display(race) : string.Empty,
         minion.IsGolden,
-        Describe(minion),
-        CardArtCache.Shared.Get(minion.CardId));
-
-    /// <summary>
-    /// Doplněk pod velkou kartou: typ minionu, pozice a klíčová slova celá. Na kartičce se
-    /// klíčová slova vejdou jen oříznutá, protože její šířka je pevná.
-    /// </summary>
-    private static string Describe(BoardMinion minion)
-    {
-        var parts = new List<string>(4);
-        if (minion.IsGolden)
-        {
-            parts.Add("Zlatá");
-        }
-
-        if (minion.Race is { } race)
-        {
-            parts.Add(MinionRace.Display(race));
-        }
-
-        parts.Add($"Pozice {minion.ZonePosition}");
-        if (minion.Keywords.Length > 0)
-        {
-            parts.Add(minion.Keywords);
-        }
-
-        return string.Join(" · ", parts);
-    }
+        $"Pozice {minion.ZonePosition}",
+        CardCache.Shared.Get(minion.CardId));
 }
