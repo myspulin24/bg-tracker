@@ -2,7 +2,7 @@ namespace Tracker.Core;
 
 public sealed class TrackerState
 {
-    private const int MaxRecentEvents = 8;
+    private const int MaxRecentEvents = 6;
 
     private readonly Dictionary<string, ObservedParticipant> participants = new(StringComparer.Ordinal);
     private readonly Queue<string> recentEvents = new();

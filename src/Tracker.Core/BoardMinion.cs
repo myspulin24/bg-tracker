@@ -25,17 +25,17 @@ public sealed record BoardMinion(
         ? "—"
         : $"{Attack?.ToString() ?? "?"}/{Health?.ToString() ?? "?"}";
 
-    /// <summary>Zkratky klíčových slov, například <c>T · DS · W</c>.</summary>
+    /// <summary>Klíčová slova celým jménem, například <c>Taunt · Divine Shield</c>.</summary>
     public string Keywords
     {
         get
         {
             var builder = new StringBuilder();
-            Append(builder, HasTaunt, "T");
-            Append(builder, HasDivineShield, "DS");
-            Append(builder, HasReborn, "R");
-            Append(builder, HasVenomous, "V");
-            Append(builder, HasWindfury, "W");
+            Append(builder, HasTaunt, "Taunt");
+            Append(builder, HasDivineShield, "Divine Shield");
+            Append(builder, HasReborn, "Reborn");
+            Append(builder, HasVenomous, "Venomous");
+            Append(builder, HasWindfury, "Windfury");
             return builder.ToString();
         }
     }

@@ -107,7 +107,7 @@ public sealed class BattlegroundsStateTests
         var minion = Assert.Single(tracker.State.PlayerBoard);
         Assert.Equal("Southsea Busker", minion.Name);
         Assert.True(minion.IsGolden);
-        Assert.Equal("T", minion.Keywords);
+        Assert.Equal("Taunt", minion.Keywords);
     }
 
     [Fact]

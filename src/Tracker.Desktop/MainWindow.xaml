@@ -15,24 +15,38 @@
                     <DataTemplate>
                         <Grid Height="18">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="14" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="13" />
+                                <ColumnDefinition Width="Auto" MaxWidth="150" />
+                                <ColumnDefinition Width="Auto" MaxWidth="112" />
+                                <ColumnDefinition Width="*" MinWidth="4" />
+                                <ColumnDefinition Width="40" />
+                                <ColumnDefinition Width="38" />
                                 <ColumnDefinition Width="54" />
-                                <ColumnDefinition Width="22" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Position}" Foreground="#6E7E96" FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Position}" Foreground="#6E7E96" FontSize="9" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="★" Foreground="{StaticResource Accent}" FontSize="10" Margin="0,0,4,0"
-                                           VerticalAlignment="Center"
+                                <TextBlock Text="★" Foreground="#F4D06F" FontSize="10" Margin="0,0,3,0"
+                                           VerticalAlignment="Center" ToolTip="Zlatá karta"
                                            Visibility="{Binding IsGolden, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Text="{Binding Name}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Keywords}" Foreground="#6E7E96" FontSize="9" Margin="5,1,0,0"
-                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Name}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Name}" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding Stats}" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="#FA7B72" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="{Binding Tier}" FontSize="10" Foreground="{StaticResource Accent}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{Binding Keywords}" Foreground="#7C8CA4" FontSize="9"
+                                       Margin="6,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding Keywords}" />
+                            <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right"
+                                        VerticalAlignment="Center" ToolTip="Útok">
+                                <TextBlock Text="⚔" Foreground="#C8B27A" FontSize="9" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Attack}" FontSize="11" FontWeight="SemiBold" Foreground="#EBD9A6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Right"
+                                        VerticalAlignment="Center" ToolTip="Život">
+                                <TextBlock Text="♥" Foreground="#C4685F" FontSize="9" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Health}" FontSize="11" FontWeight="SemiBold" Foreground="#FA7B72" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="6" Text="{Binding TierStars}" FontSize="7" Margin="6,0,0,0"
+                                       Foreground="{StaticResource Accent}" HorizontalAlignment="Right"
+                                       VerticalAlignment="Center" ToolTip="{Binding TierTooltip}" />
                         </Grid>
                     </DataTemplate>
                 </Setter.Value>
@@ -231,12 +245,27 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Na nižším monitoru je tahle sekce první na sbalení; ušetří skoro 300 px. -->
                 <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="12,10">
                     <StackPanel>
-                        <TextBlock Text="MOJE DESKA" Style="{StaticResource SectionTitleStyle}" />
-                        <ItemsControl ItemsSource="{Binding PlayerBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
-                        <TextBlock Text="{Binding OpposingBoardTitle}" Style="{StaticResource SectionTitleStyle}" Margin="0,9,0,0" />
-                        <ItemsControl ItemsSource="{Binding OpposingBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
+                        <Button Click="ToggleBoardsButton_Click" HorizontalContentAlignment="Stretch"
+                                Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                ToolTip="Skrýt nebo zobrazit desky">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="BoardsChevron" Text="▾" Style="{StaticResource SectionTitleStyle}"
+                                           Margin="0,0,6,0" />
+                                <TextBlock x:Name="BoardsHeader" Grid.Column="1" Text="MOJE DESKA"
+                                           Style="{StaticResource SectionTitleStyle}" />
+                            </Grid>
+                        </Button>
+                        <StackPanel x:Name="BoardsContent">
+                            <ItemsControl ItemsSource="{Binding PlayerBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
+                            <TextBlock Text="{Binding OpposingBoardTitle}" Style="{StaticResource SectionTitleStyle}" Margin="0,9,0,0" />
+                            <ItemsControl ItemsSource="{Binding OpposingBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

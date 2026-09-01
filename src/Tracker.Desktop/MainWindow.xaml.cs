@@ -20,6 +20,9 @@ public partial class MainWindow : Window
     /// <summary>Výška, na kterou je rozložení navržené, aby se žádný panel nemusel scrollovat.</summary>
     private const double DesignHeight = 1084;
 
+    /// <summary>Kolik výšky ušetří sbalení sekce s deskami.</summary>
+    private const double BoardsHeight = 288;
+
     /// <summary>Jak často se v živém režimu ověří, jestli hra nezaložila nový session log.</summary>
     private const int LiveDiscoveryIntervalTicks = 15;
 
@@ -42,13 +45,38 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Height = Math.Min(DesignHeight, Math.Max(MinHeight, SystemParameters.WorkArea.Height - 24));
-        expandedHeight = Height;
+
+        // Na monitoru, kam se plné rozložení nevejde, se desky rovnou sbalí. Jinak by uživatel
+        // přišel o spodek okna včetně ovládacích tlačítek.
+        var available = SystemParameters.WorkArea.Height - 24;
+        SetBoardsVisible(available >= DesignHeight);
         DataContext = viewModel;
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
         timer.Tick += Timer_Tick;
         Loaded += MainWindow_Loaded;
+    }
+
+    private void ToggleBoardsButton_Click(object sender, RoutedEventArgs eventArgs) =>
+        SetBoardsVisible(BoardsContent.Visibility != Visibility.Visible);
+
+    /// <summary>
+    /// Sbalí nebo rozbalí sekci s deskami a rovnou přizpůsobí výšku okna, aby po sbalení
+    /// nezůstalo prázdné místo a po rozbalení se obsah vešel.
+    /// </summary>
+    private void SetBoardsVisible(bool visible)
+    {
+        BoardsContent.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        BoardsChevron.Text = visible ? "▾" : "▸";
+        BoardsHeader.Text = visible ? "MOJE DESKA" : "DESKY (skryto)";
+
+        var wanted = visible ? DesignHeight : DesignHeight - BoardsHeight;
+        var available = SystemParameters.WorkArea.Height - 24;
+        expandedHeight = Math.Min(wanted, Math.Max(MinHeight, available));
+        if (!isCollapsed)
+        {
+            Height = expandedHeight;
+        }
     }
 
     /// <summary>

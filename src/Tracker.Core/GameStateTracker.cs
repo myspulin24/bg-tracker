@@ -569,6 +569,9 @@ public sealed partial class GameStateTracker
 
     private static string PhaseName(string value) => value.ToUpperInvariant() switch
     {
+        // V Battlegrounds není mulligan výměnou karet, ale výběrem hrdiny.
+        "BEGIN_MULLIGAN" => "výběr hrdiny",
+        "BEGIN_FIRST" or "BEGIN_SHUFFLE" or "BEGIN_DRAW" => "start hry",
         "MAIN_READY" => "příprava",
         "MAIN_START_TRIGGERS" => "spouštění kola",
         "MAIN_START" => "začátek kola",

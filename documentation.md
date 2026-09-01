@@ -622,6 +622,12 @@ principiálně nemohou. Místo pro maximální počet položek si rezervují nap
 Jediný scrollovatelný panel je `POSLEDNÍ UDÁLOSTI`. Ten zůstává interaktivní, aby v něm
 fungovalo kolečko myši i tažení scrollbaru.
 
+Návrhová výška 1084 se ale nevejde na monitor s rozlišením 1920×1080, kde po odečtení
+hlavního panelu zbývá kolem 1010 bodů. Proto jde sekce s deskami sbalit klikem na její
+nadpis; okno se tím zmenší zhruba o 288 bodů na 796. **Když je při startu k dispozici
+méně místa, než potřebuje plné rozložení, sekce se sbalí sama**, aby uživatel nepřišel
+o spodek okna s ovládacími tlačítky.
+
 ### 11.3 Obsah
 
 Horní karty zobrazují kolo, aktuální místo v žebříčku, zlato a fázi.
@@ -650,10 +656,16 @@ kola. Dokud jste proti hráči nenastoupili, podokno to řekne místo prázdnéh
 
 Následuje karta s vlastní deskou a pod ní buď `NABÍDKA BOBA`, nebo `DESKA SOUPEŘE` podle
 toho, jestli právě běží souboj. Každý řádek ukazuje pozici, hvězdičku u zlaté karty,
-jméno, zkratky klíčových slov, statistiky a tier.
+jméno, klíčová slova celým jménem (`Taunt`, `Divine Shield`, `Reborn`, `Venomous`,
+`Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako hvězdičky, stejně
+jako je ukazuje karta ve hře.
+
+Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku zmenší. Slouží
+to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
 
 Panel `POSLEDNÍ UDÁLOSTI` zobrazuje události od nejnovější po nejstarší. `TrackerState`
-uchovává frontu maximálně osmi položek; po přidání deváté zahodí nejstarší.
+uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je nižší
+než šest řádků, proto se v něm scrolluje.
 
 Dolní část obsahuje stav, výsledek, diagnostiku počtu zpracovaných řádků a rozpoznaných
 událostí a tlačítka:
@@ -930,8 +942,8 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
     lobby ve skutečnosti nenabízí. Podrobnosti v kapitole 8.6.
 17. **Pozice a šířka okna se nepersistují.** Výška se vypočítá při startu, uživatelské
     přesunutí nebo resize se mezi relacemi neukládají.
-18. **Na nižším monitoru se obsah ořízne.** Rozložení je navržené na 1084 px. Na kratší
-    pracovní ploše se spodní část okna nezobrazí, protože panely záměrně nescrollují.
+18. **Sbalení desek se nepamatuje.** Na nižším monitoru se sekce sbalí sama při každém
+    startu, ruční volba se ale mezi spuštěními neukládá.
 19. **Soukromí logů.** Vlastní archivy mohou obsahovat BattleTagy a další syrová data;
     nemají se automaticky sdílet bez kontroly.
 
