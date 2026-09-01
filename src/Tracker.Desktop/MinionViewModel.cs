@@ -7,7 +7,7 @@ public sealed record MinionViewModel(
     string Name,
     string Attack,
     string Health,
-    string TierStars,
+    string Tier,
     string TierTooltip,
     string Keywords,
     bool IsGolden)
@@ -17,12 +17,8 @@ public sealed record MinionViewModel(
         minion.Name,
         minion.Attack?.ToString() ?? "—",
         minion.Health?.ToString() ?? "—",
-        Stars(minion.TechLevel),
+        minion.TechLevel?.ToString() ?? "—",
         minion.TechLevel is { } tier ? $"Tavern Tier {tier}" : "Neznámý tavern tier",
         minion.Keywords,
         minion.IsGolden);
-
-    /// <summary>Tavern tier se ukazuje hvězdičkami stejně jako na kartě ve hře.</summary>
-    private static string Stars(int? tier) =>
-        tier is > 0 and <= 10 ? new string('★', tier.Value) : string.Empty;
 }

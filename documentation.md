@@ -612,7 +612,7 @@ min(1163, max(640, výška pracovní plochy - 24))     rozbalené
 min(879,  max(640, výška pracovní plochy - 24))     sbalené
 ```
 
-Šířka je 440 a minimální šířka 390. Návrhové výšky pokrývají nejhorší možný obsah:
+Šířka je 500 a minimální šířka 440. Návrhové výšky pokrývají nejhorší možný obsah:
 osm hráčů lobby, sedm minionů vlastní desky, sedm karet v nabídce Boba nebo na desce
 soupeře a šest posledních událostí.
 
@@ -651,15 +651,18 @@ Nad tabulkou je ještě řádek s typy minionů, které se objevily v nabídce B
 Řádek lobby je barevně odlišený: modrý pro lokálního hráče, okrový pro dalšího soupeře.
 Vyřazený hráč je ztlumený, má lebku před jménem hrdiny a místo HP křížek.
 
-Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče.
+Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče,
+zarovnané stejně jako hlavní seznam.
 U lokálního hráče jde o živou desku, u ostatních o poslední, kterou log ukázal, s číslem
 kola. Dokud jste proti hráči nenastoupili, podokno to řekne místo prázdného seznamu.
 
 Následuje karta s vlastní deskou a pod ní buď `NABÍDKA BOBA`, nebo `DESKA SOUPEŘE` podle
 toho, jestli právě běží souboj. Každý řádek ukazuje pozici, hvězdičku u zlaté karty,
 jméno, klíčová slova celým jménem (`Taunt`, `Divine Shield`, `Reborn`, `Venomous`,
-`Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako hvězdičky, stejně
-jako je ukazuje karta ve hře.
+`Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako číslo s hvězdičkou.
+Sloupce drží stejnou šířku napříč řádky přes `SharedSizeGroup`; bez něj si každý řádek
+měří `Auto` sloupce sám a hodnoty se nezarovnají pod sebe. Totéž platí pro podokno
+s deskou hráče, kde byl nesoulad nejvíc vidět.
 
 Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku zmenší. Slouží
 to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
