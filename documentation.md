@@ -621,7 +621,7 @@ protože objem tvoří `GameState` řádky, které se stejně potřebují. Se za
 1,70 MB proti 2,22 MB. Za půl megabajtu na zápas nestojí za to přijít o možnost archiv znovu
 přečíst vylepšeným parserem — dnes ignorovaný řádek může zítra nést informaci navíc.
 
-Drží se posledních `MatchLogArchive.RetainedMatches` dohraných zápasů, tedy třicet. Ořez i dobalení
+Drží se posledních `MatchLogArchive.RetainedMatches` dohraných zápasů, tedy pět. Ořez i dobalení
 pozůstalých prostých logů proběhnou při otevření archivu, takže se složka srovná i po
 aktualizaci ze starší verze nebo po pádu aplikace.
 
@@ -761,6 +761,12 @@ okrový pro dalšího soupeře. V Duos jsou dvojice oddělené mezerou a číslo
 k prvnímu z nich, protože místo patří týmu; podrobnosti v kapitole 8.8. Karta `MÍSTO` ukazuje
 `3/4` v Duos a `5/8` v sólu a v hlavičce okna přibude vedle režimu čtení popisek `DUOS`.
 Vyřazený hráč je ztlumený, má lebku před jménem hrdiny a místo HP křížek.
+
+Načítání uloženého zápasu běží na pozadí a nad tlačítky se po tu dobu ukazuje pruh s postupem.
+Půl milionu řádků se parsuje pár sekund a na vlákně rozhraní by okno mezitím zamrzlo. Postup se
+počítá z pozice v souboru na disku, protože počet řádků se u zabaleného zápasu předem zjistit
+nedá. V hlavičce se místo jména souboru ukazuje jen datum a čas zápasu, celá cesta je
+v podokně; jméno archivu má přes čtyřicet znaků a z hlavičky přetékalo.
 
 Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče. Miniony
 v něm nejsou řádky, ale kartičky vedle sebe podle kapitoly 11.6.
@@ -1143,7 +1149,7 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
    fullscreenem; doporučený je borderless fullscreen.
 5. **Demo vs. live auto-detekce.** Aktivní Hearthstone může automaticky přepnout demo
    zpět do live režimu.
-6. **Retence je jen podle počtu.** Drží se posledních třicet zápasů bez ohledu na to, kolik
+6. **Retence je jen podle počtu.** Drží se posledních pět zápasů bez ohledu na to, kolik
    místa zaberou. Velmi dlouhé zápasy tak můžou složku nafouknout víc, než by strop podle
    velikosti dovolil.
 7. **Jeden globální checkpoint.** `checkpoint.json` reprezentuje naposledy použitý

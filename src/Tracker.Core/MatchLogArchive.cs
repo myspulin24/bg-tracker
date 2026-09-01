@@ -14,10 +14,11 @@ public sealed class MatchLogArchive : IDisposable
     public const string PlainExtension = ".power.log";
 
     /// <summary>
-    /// Kolik dokončených zápasů se drží. Bez stropu složka roste donekonečna; při obvyklém
-    /// večeru je to zhruba deset zápasů, takže třicet pokryje i delší sezení.
+    /// Kolik dokončených zápasů se drží. Bez stropu složka roste donekonečna a i zabalený
+    /// zápas má pár megabajtů. Ořez proběhne při každém otevření archivu, takže se složka
+    /// srovná hned po startu aplikace.
     /// </summary>
-    public const int RetainedMatches = 30;
+    public const int RetainedMatches = 5;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly string checkpointPath;
@@ -50,30 +51,43 @@ public sealed class MatchLogArchive : IDisposable
     /// Čte zápasový log bez ohledu na to, jestli je zabalený. Volající tak nemusí řešit, kterou
     /// příponu soubor má.
     /// </summary>
-    public static IEnumerable<string> ReadMatch(string path)
+    public static IEnumerable<string> ReadMatch(string path) => ReadMatch(path, null);
+
+    /// <summary>
+    /// Totéž s hlášením postupu 0 až 1. Počítá se z pozice v souboru na disku, protože počet
+    /// řádků se u zabaleného zápasu předem zjistit nedá, aniž by se celý rozbalil.
+    /// </summary>
+    public static IEnumerable<string> ReadMatch(string path, IProgress<double>? progress)
     {
         if (!File.Exists(path))
         {
             yield break;
         }
 
-        if (!path.EndsWith(".br", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var line in File.ReadLines(path))
-            {
-                yield return line;
-            }
-
-            yield break;
-        }
-
         using var file = File.OpenRead(path);
-        using var unpacked = new BrotliStream(file, CompressionMode.Decompress);
-        using var reader = new StreamReader(unpacked);
+        var total = Math.Max(1, file.Length);
+        using var reader = path.EndsWith(".br", StringComparison.OrdinalIgnoreCase)
+            ? new StreamReader(new BrotliStream(file, CompressionMode.Decompress))
+            : new StreamReader(file);
+
+        var reported = -1;
         while (reader.ReadLine() is { } line)
         {
+            if (progress is not null)
+            {
+                // Hlásí se po celých procentech; častější hlášení jen zdržuje vlákno rozhraní.
+                var percent = (int)(100 * file.Position / total);
+                if (percent != reported)
+                {
+                    reported = percent;
+                    progress.Report(percent / 100.0);
+                }
+            }
+
             yield return line;
         }
+
+        progress?.Report(1);
     }
 
     /// <summary>Rozpozná soubor, který vyrobil tracker, ať už zabalený, nebo ne.</summary>

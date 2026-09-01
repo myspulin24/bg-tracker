@@ -26,6 +26,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string updateStatus = string.Empty;
     private bool hasUpdate;
     private bool isUpdateReady;
+    private bool isLoading;
+    private double loadProgress;
+    private string loadStatus = string.Empty;
+    private string sourceTooltip = string.Empty;
     private readonly Dictionary<int, MinionViewModel[]> boardCache = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -60,6 +64,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Stažená verze čeká na výměnu, takže má smysl nabídnout restart.</summary>
     public bool IsUpdateReady { get => isUpdateReady; set => Set(ref isUpdateReady, value); }
+
+    /// <summary>Načítá se zápas ze souboru; po tu dobu se ukazuje pruh s postupem.</summary>
+    public bool IsLoading { get => isLoading; set => Set(ref isLoading, value); }
+
+    /// <summary>Postup načítání v procentech.</summary>
+    public double LoadProgress { get => loadProgress; set => Set(ref loadProgress, value); }
+
+    public string LoadStatus { get => loadStatus; set => Set(ref loadStatus, value); }
+
+    /// <summary>Plná cesta ke zdroji; v hlavičce se vejde jen zkrácený popis.</summary>
+    public string SourceTooltip { get => sourceTooltip; set => Set(ref sourceTooltip, value); }
 
     public void Update(TrackerState state)
     {

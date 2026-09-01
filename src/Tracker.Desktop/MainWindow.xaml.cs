@@ -1,8 +1,10 @@
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Text.RegularExpressions;
 using System.Windows.Threading;
 using Tracker.Core;
 
@@ -299,7 +301,7 @@ public partial class MainWindow : Window
         // kopii v matches a přepsalo checkpoint, který ukazuje na běžící hru.
         if (MatchLogArchive.IsMatchArchive(dialog.FileName))
         {
-            StartReplay(dialog.FileName);
+            await StartReplayAsync(dialog.FileName);
             return;
         }
 
@@ -316,39 +318,80 @@ public partial class MainWindow : Window
     /// Přehraje uložený zápas jen pro čtení: nic se nearchivuje a checkpoint zůstane, kde byl.
     /// Zabalený soubor se rozbalí za běhu.
     /// </summary>
-    private void StartReplay(string path)
+    private async Task StartReplayAsync(string path)
     {
         timer.Stop();
         matchArchive?.Dispose();
         matchArchive = null;
         liveReader = null;
-        tracker = new GameStateTracker();
-        parser = new PowerLogParser();
+        var replayTracker = new GameStateTracker();
+        var replayParser = new PowerLogParser();
         mode = TrackerMode.Replay;
         isSourceAutoDiscovered = false;
         demoIndex = 0;
 
+        viewModel.IsLoading = true;
+        viewModel.LoadProgress = 0;
+        viewModel.LoadStatus = $"Načítám {MatchLabel(path)}…";
+        viewModel.IsPauseEnabled = false;
+
+        // Půl milionu řádků se parsuje pár sekund. Na vlákně rozhraní by okno po tu dobu
+        // zamrzlo, takže se čte na pozadí a hlásí se postup.
+        var progress = new Progress<double>(fraction =>
+        {
+            viewModel.LoadProgress = fraction * 100;
+            viewModel.LoadStatus = $"Načítám {MatchLabel(path)}… {fraction * 100:N0} %";
+        });
+
         var lines = 0;
         try
         {
-            foreach (var line in MatchLogArchive.ReadMatch(path))
+            lines = await Task.Run(() =>
             {
-                tracker.Apply(parser.Parse(line));
-                lines++;
-            }
+                var count = 0;
+                foreach (var line in MatchLogArchive.ReadMatch(path, progress))
+                {
+                    replayTracker.Apply(replayParser.Parse(line));
+                    count++;
+                }
+
+                return count;
+            });
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException)
         {
-            viewModel.SourceDescription = $"zápas se nepodařilo přečíst: {exception.Message}";
+            viewModel.IsLoading = false;
+            viewModel.SourceDescription = "zápas se nepodařilo přečíst";
+            viewModel.SourceTooltip = exception.Message;
             return;
         }
 
+        tracker = replayTracker;
+        parser = replayParser;
+        viewModel.IsLoading = false;
         viewModel.Update(tracker.State);
         viewModel.ModeLabel = "ZÁZNAM";
-        viewModel.SourceDescription = $"{Path.GetFileName(path)} ({lines} řádků)";
-        viewModel.PauseButtonText = "Pozastavit";
-        viewModel.IsPauseEnabled = false;
+        viewModel.SourceDescription = MatchLabel(path);
+        viewModel.SourceTooltip = $"{path}{Environment.NewLine}{lines:N0} řádků";
     }
+
+    /// <summary>
+    /// Krátký popis uloženého zápasu do hlavičky. Celé jméno souboru je dlouhé přes čtyřicet
+    /// znaků a z hlavičky přetékalo, proto se z něj vytáhne jen datum a čas.
+    /// </summary>
+    private static string MatchLabel(string path)
+    {
+        var name = Path.GetFileName(path);
+        var stamp = MatchStampRegex().Match(name);
+        return stamp.Success &&
+               DateTime.TryParseExact(stamp.Value, "yyyyMMdd-HHmmss", CultureInfo.InvariantCulture,
+                   DateTimeStyles.None, out var started)
+            ? $"zápas {started:d. M. HH:mm}"
+            : name;
+    }
+
+    [GeneratedRegex(@"d{8}-d{6}")]
+    private static partial Regex MatchStampRegex();
 
     private async Task StartLiveAsync(string path, bool autoDiscovered)
     {
