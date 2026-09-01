@@ -6,6 +6,85 @@
         WindowStyle="None" ResizeMode="CanResizeWithGrip" AllowsTransparency="True"
         Background="Transparent" Topmost="True" ShowInTaskbar="True">
     <Window.Resources>
+        <!-- Kartička minionu. Kresba tvoří pozadí, spodní část přetéká tmavým přechodem a v něm
+             jsou všechny údaje, které dřív stály ve zvláštních sloupcích: tavern tier vlevo
+             nahoře, jméno, klíčová slova, útok a život dole. Protože karta nese všechno sama,
+             dá se jich vedle sebe naskládat celá deska. -->
+        <DataTemplate x:Key="MinionCardTemplate">
+            <Border Width="98" Height="140" CornerRadius="7" ClipToBounds="True" Margin="0,0,5,5"
+                    Background="#101825" BorderThickness="1.4">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="#42566F" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsGolden}" Value="True">
+                                <Setter Property="BorderBrush" Value="#E0B24A" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Image Source="{Binding Art.Image}" Stretch="UniformToFill" VerticalAlignment="Top" />
+                    <!-- Bez přechodu by text na světlé kresbě zanikl. -->
+                    <Rectangle>
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#00060A11" Offset="0.28" />
+                                <GradientStop Color="#B0060A11" Offset="0.54" />
+                                <GradientStop Color="#FA060A11" Offset="0.76" />
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4"
+                            Background="#D2101825" BorderBrush="#E6A23C" BorderThickness="1"
+                            CornerRadius="4" Padding="4,0,4,1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Tier}" FontSize="10" FontWeight="Bold" Foreground="#F4D06F" />
+                            <TextBlock Text="★" FontSize="8" Foreground="#F4D06F" Margin="1,1,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="★" FontSize="13" FontWeight="Bold" Foreground="#F4D06F"
+                               HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,5,0"
+                               Visibility="{Binding IsGolden, Converter={StaticResource BoolToVisibility}}" />
+                    <StackPanel VerticalAlignment="Bottom" Margin="5,0,5,4">
+                        <TextBlock Text="{Binding Name}" FontSize="9.5" FontWeight="Bold" TextWrapping="Wrap"
+                                   MaxHeight="24" LineHeight="12" LineStackingStrategy="BlockLineHeight"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Keywords}" FontSize="7.5" Foreground="#93A6BF" Margin="0,1,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding HasKeywords, Converter={StaticResource BoolToVisibility}}" />
+                        <Grid Margin="0,3,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⚔" FontSize="8" Foreground="#C8B27A" Margin="0,1,2,0" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Attack}" FontSize="11" FontWeight="Bold" Foreground="#F2DFA8" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock Text="{Binding Health}" FontSize="11" FontWeight="Bold" Foreground="#FA7B72" />
+                                <TextBlock Text="♥" FontSize="8" Foreground="#C4685F" Margin="2,1,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- Deska v podokně hráče: kartičky vedle sebe. Šířka je nastavená přesně na sedm karet,
+             což je maximum, které Battlegrounds na desce dovolí. -->
+        <Style x:Key="MinionCardsStyle" TargetType="ItemsControl">
+            <Setter Property="MaxWidth" Value="721" />
+            <Setter Property="ItemTemplate" Value="{StaticResource MinionCardTemplate}" />
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Desky se nikdy nescrollují: ItemsControl místo ListBoxu a rezervovaná výška
              na maximální možný počet minionů, aby overlay při změně počtu neposkakoval. -->
         <Style x:Key="MinionListStyle" TargetType="ItemsControl">
@@ -13,7 +92,24 @@
             <Setter Property="ItemTemplate">
                 <Setter.Value>
                     <DataTemplate>
-                        <Grid Height="18">
+                        <Grid Height="18" Background="Transparent"
+                              ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="120000"
+                              ToolTipService.Placement="Left" ToolTipService.HorizontalOffset="-6">
+                            <!-- V okně se na kartičku místo nenajde, ale po najetí myší se ukáže
+                                 zvětšená; je to tatáž šablona, jen zvětšená transformací. -->
+                            <Grid.ToolTip>
+                                <ToolTip>
+                                    <StackPanel>
+                                        <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MinionCardTemplate}">
+                                            <ContentPresenter.LayoutTransform>
+                                                <ScaleTransform ScaleX="2" ScaleY="2" />
+                                            </ContentPresenter.LayoutTransform>
+                                        </ContentPresenter>
+                                        <TextBlock Text="{Binding Detail}" Foreground="{StaticResource SecondaryText}"
+                                                   FontSize="11" MaxWidth="186" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </ToolTip>
+                            </Grid.ToolTip>
                             <!-- SharedSizeGroup drží stejnou šířku napříč všemi řádky seznamu.
                                  Bez něj si každý řádek měří Auto sloupce sám a hodnoty se
                                  nezarovnají pod sebe. -->
@@ -29,26 +125,24 @@
                             <TextBlock Text="{Binding Position}" Foreground="#6E7E96" FontSize="9" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="★" Foreground="#F4D06F" FontSize="10" Margin="0,0,3,0"
-                                           VerticalAlignment="Center" ToolTip="Zlatá karta"
+                                           VerticalAlignment="Center"
                                            Visibility="{Binding IsGolden, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Text="{Binding Name}" FontSize="11" TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding Name}" />
+                                <TextBlock Text="{Binding Name}" FontSize="11" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <TextBlock Grid.Column="2" Text="{Binding Keywords}" Foreground="#7C8CA4" FontSize="9"
-                                       Margin="6,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                       ToolTip="{Binding Keywords}" />
+                                       Margin="6,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right"
-                                        VerticalAlignment="Center" ToolTip="Útok">
+                                        VerticalAlignment="Center">
                                 <TextBlock Text="⚔" Foreground="#C8B27A" FontSize="9" Margin="0,0,3,0" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding Attack}" FontSize="11" FontWeight="SemiBold" Foreground="#EBD9A6" />
                             </StackPanel>
                             <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Right"
-                                        VerticalAlignment="Center" ToolTip="Život">
+                                        VerticalAlignment="Center">
                                 <TextBlock Text="♥" Foreground="#C4685F" FontSize="9" Margin="0,0,3,0" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding Health}" FontSize="11" FontWeight="SemiBold" Foreground="#FA7B72" />
                             </StackPanel>
                             <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right"
-                                        VerticalAlignment="Center" ToolTip="{Binding TierTooltip}">
+                                        VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Tier}" FontSize="11" FontWeight="SemiBold"
                                            Foreground="{StaticResource Accent}" />
                                 <TextBlock Text="★" FontSize="9" Foreground="{StaticResource Accent}"
@@ -192,16 +286,16 @@
                                             ToolTipService.InitialShowDelay="180" ToolTipService.ShowDuration="120000"
                                             ToolTipService.Placement="Left" ToolTipService.HorizontalOffset="-6">
                                         <Border.ToolTip>
-                                            <ToolTip MaxWidth="470">
-                                                <StackPanel Grid.IsSharedSizeScope="True">
+                                            <ToolTip MaxWidth="760">
+                                                <StackPanel>
                                                     <TextBlock Text="{Binding HeroName}" FontWeight="Bold" FontSize="12"
                                                                TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Text="{Binding BattleTag}" Foreground="{StaticResource SecondaryText}"
                                                                FontSize="10" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Text="{Binding BoardCaption}" Foreground="{StaticResource Accent}"
                                                                FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap" />
-                                                    <ItemsControl ItemsSource="{Binding Board}" Style="{StaticResource MinionListStyle}"
-                                                                  MinHeight="0" Margin="0,6,0,0" MinWidth="440"
+                                                    <ItemsControl ItemsSource="{Binding Board}" Style="{StaticResource MinionCardsStyle}"
+                                                                  Margin="0,7,0,0"
                                                                   Visibility="{Binding HasBoard, Converter={StaticResource BoolToVisibility}}" />
                                                 </StackPanel>
                                             </ToolTip>

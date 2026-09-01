@@ -95,8 +95,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             BoardCaption(participant, state)))]);
 
         Sync(PlayerBoard, [.. state.PlayerBoard.Select(MinionViewModel.From)]);
-        Sync(OpposingBoard,
-            [.. (state.IsCombatPhase ? state.OpponentBoard : state.Shop).Select(MinionViewModel.From)]);
+        Sync(OpposingBoard, [.. (state.IsCombatPhase ? state.OpponentBoard : state.Shop).Select(MinionViewModel.From)]);
         Sync(Events, [.. state.RecentEvents.Reverse()]);
     }
 

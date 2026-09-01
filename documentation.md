@@ -56,7 +56,7 @@ projít bez varování.
 
 | Projekt / cesta | Odpovědnost |
 | --- | --- |
-| `src/Tracker.Core` | Parser `Power.log`, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů a `MatchRecorder`. |
+| `src/Tracker.Core` | Parser `Power.log`, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb karet. |
 | `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly a ovládání okna. |
 | `src/Tracker.App` | Původní konzolová varianta, replay a textový dashboard. |
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
@@ -520,7 +520,13 @@ hry.
     match-yyyyMMdd-HHmmss-fff.power.log
     match-yyyyMMdd-HHmmss-fff-1.power.log
     ...
+  cardart\
+    BG31_035.jpg
+    ...
 ```
+
+Složka `cardart` je jen mezipaměť obrázků podle kapitoly 11.6. Smazat se dá kdykoli;
+aplikace si potřebné kresby stáhne znovu.
 
 Přípona s pořadovým číslem se použije pouze při kolizi časového názvu. Soubory obsahují
 původní řádky `Power.log` náležející zápasu. Proto mohou obsahovat BattleTagy a další
@@ -651,8 +657,8 @@ Nad tabulkou je ještě řádek s typy minionů, které se objevily v nabídce B
 Řádek lobby je barevně odlišený: modrý pro lokálního hráče, okrový pro dalšího soupeře.
 Vyřazený hráč je ztlumený, má lebku před jménem hrdiny a místo HP křížek.
 
-Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče,
-zarovnané stejně jako hlavní seznam.
+Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče. Miniony
+v něm nejsou řádky, ale kartičky vedle sebe podle kapitoly 11.6.
 U lokálního hráče jde o živou desku, u ostatních o poslední, kterou log ukázal, s číslem
 kola. Dokud jste proti hráči nenastoupili, podokno to řekne místo prázdného seznamu.
 
@@ -661,8 +667,11 @@ toho, jestli právě běží souboj. Každý řádek ukazuje pozici, hvězdičku
 jméno, klíčová slova celým jménem (`Taunt`, `Divine Shield`, `Reborn`, `Venomous`,
 `Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako číslo s hvězdičkou.
 Sloupce drží stejnou šířku napříč řádky přes `SharedSizeGroup`; bez něj si každý řádek
-měří `Auto` sloupce sám a hodnoty se nezarovnají pod sebe. Totéž platí pro podokno
-s deskou hráče, kde byl nesoulad nejvíc vidět.
+měří `Auto` sloupce sám a hodnoty se nezarovnají pod sebe.
+
+Po najetí myší na řádek se vlevo ukáže tatáž kartička jako v podokně hráče, jen zvětšená
+transformací na dvojnásobek, a pod ní řádek s typem minionu, pozicí a celými klíčovými
+slovy. Do kartičky se klíčová slova vejdou jen oříznutá, protože má pevnou šířku.
 
 Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku zmenší. Slouží
 to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
@@ -695,6 +704,52 @@ ticku a zavíral právě otevřené podokno.
 Styly scrollbarů jsou definované v `Tracker.Desktop/App.xaml`. Používají vlastní tmavé
 pozadí, zaoblený thumb a barvy sladěné s kartami overlaye. Nativní světlý scrollbar se
 proto v panelu událostí nepoužívá.
+
+### 11.6 Kartičky minionů a kresby karet
+
+Kartička je `MinionCardTemplate` v `MainWindow.xaml`, 98 × 140 bodů. Kresba karty tvoří
+pozadí, přes spodní polovinu leží přechod do skoro černé a v něm jsou všechny údaje:
+tavern tier v odznaku vlevo nahoře, hvězdička u zlaté karty vpravo nahoře, jméno,
+klíčová slova a dole útok u ikony meče a život u ikony srdce. Protože karta nese kompletní
+informaci sama, skládají se karty vedle sebe do `WrapPanel`; šířka seznamu je nastavená
+přesně na sedm karet, což je maximum na desce v Battlegrounds.
+
+Kresby nejde brát z instalace hry. Obrázky leží v `Data\Win\*.unity3d`, což je zhruba 12 GB
+Unity asset bundlů; jejich čtení by vyžadovalo zvláštní parser, po každém patchi by se
+rozpadlo mapování na Card ID a extrahovaný art Blizzardu nemá co dělat ve veřejném
+repozitáři. Kresba se proto stahuje z veřejné CDN HearthstoneJSON:
+
+```text
+https://art.hearthstonejson.com/v1/256x/{CardID}.jpg
+```
+
+Hotové renderované karty (`/v1/render/latest/enUS/256x/`) tatáž CDN sice nabízí, ale jen
+zhruba do setu BG29; z měřeného vzorku čtyřiceti Card ID z reálných logů jich mělo render
+patnáct, kdežto kresbu třicet sedm. Ty tři chybějící byly enchanty a pomocná karta
+`TB_BaconShop_DragSell`, které se na desce nikdy nezobrazí. Kreslit rámeček a čísla vlastní
+šablonou je navíc přesnější: hotový render nese základní statistiky karty, kdežto tracker
+zná ty skutečné, nabuffované.
+
+`CardArtProvider` v `Tracker.Core` řeší stahování a mezipaměť:
+
+- soubory jdou do `%LOCALAPPDATA%\BattlegroundsTracker\cardart\{CardID}.jpg`, jedna kresba
+  má okolo 14 kB a celá jedna hra si jich vyžádá pár desítek;
+- zapisuje se přes `*.part`, aby po nedokončeném stahování nezůstal v mezipaměti useknutý
+  obrázek, který by se už nikdy nestáhl znovu;
+- souběžné dotazy na stejnou kartu sdílejí jednu úlohu;
+- odpověď 404 se zapamatuje natrvalo (enchanty kresbu nemají), ale výpadek sítě se
+  zapomene, aby si aplikace o kresbu řekla znovu, až bude připojení zpátky;
+- jméno souboru vzniká z Card ID, proto se přijímají jen písmena, číslice a podtržítko.
+
+`CardArtCache` v `Tracker.Desktop` mapuje Card ID na `CardArt`, což je držák jednoho
+`ImageSource` s `INotifyPropertyChanged`. Pro každé Card ID existuje jediná instance, takže
+model pohledu zůstane při porovnání stejný a doplnění obrázku nepřestaví celý seznam ani
+nezavře otevřené podokno. Obrázek se dekóduje na pozadí s `BitmapCacheOption.OnLoad`
+a zmrazí, aby šel předat do vlákna rozhraní.
+
+Kresba se vyžádá už při složení modelu pohledu, ne až při najetí myší. Než uživatel na
+řádek najede, je obrázek zpravidla stažený. Když se stáhnout nepodaří, kartička se vykreslí
+na tmavém podkladu a všechny textové údaje zůstanou čitelné.
 
 ## 12. Konzolová aplikace
 
@@ -848,7 +903,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje čtrnáct testů.
+Test suite aktuálně obsahuje dvacet dva testů.
 
 Původní čtyři:
 
@@ -880,7 +935,18 @@ ve skutečném osmihráčovém logu:
     i tokenů mimo pool.
 16. Zapamatování soupeřovy desky ze souboje včetně dopsání jména, které dorazí až potom.
 
-Poslední ověřený Release build prošel s 0 warnings a 0 errors; všech 16 testů prošlo.
+Tři v `UpdateTests` pokrývají aktualizace: ignorování vydání, které není novější, stažení
+jen při sedícím kontrolním součtu a nasazení připravené verze se zachováním té předchozí.
+
+Tři v `CardArtTests` pokrývají mezipaměť kreseb:
+
+20. Stažení kresby jednou a další obsloužení z disku, i po vytvoření nového poskytovatele,
+    a to bez zbytků `*.part`.
+21. Zapamatování odpovědi 404, aby se na kartu bez kresby aplikace neptala znovu.
+22. Opakování pokusu po výpadku sítě a odmítnutí Card ID, které by se nemělo dostat do
+    cesty na disku ani do adresy.
+
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 22 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -950,6 +1016,15 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
     startu, ruční volba se ale mezi spuštěními neukládá.
 19. **Soukromí logů.** Vlastní archivy mohou obsahovat BattleTagy a další syrová data;
     nemají se automaticky sdílet bez kontroly.
+20. **Kresby karet potřebují internet.** Aplikace kvůli nim chodí na cizí CDN
+    (`art.hearthstonejson.com`). Neposílá o uživateli nic než Card ID a `User-Agent`, ale
+    je to druhé místo po kontrole aktualizací, kde tracker sahá ven. Bez sítě a bez už
+    naplněné mezipaměti se kartičky vykreslí jen s texty.
+21. **Kresba nemusí existovat.** CDN je nezávislá na Blizzardu a u čerstvě vydaných karet
+    může chybět. Kartička to snese, ale obrázek prostě nebude.
+22. **Dekódované obrázky se z paměti neuvolňují.** `CardArtCache` je drží po celý běh
+    aplikace. Jedna kresba zabere zhruba 260 kB, takže dlouhá relace s mnoha různými
+    kartami paměť pozvolna zvedá.
 
 ## 17. Doporučené další kroky
 
