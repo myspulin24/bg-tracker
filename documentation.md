@@ -586,8 +586,8 @@ hry.
 %LOCALAPPDATA%\BattlegroundsTracker\
   checkpoint.json
   matches\
-    match-yyyyMMdd-HHmmss-fff.power.log
-    match-yyyyMMdd-HHmmss-fff-1.power.log
+    match-yyyyMMdd-HHmmss-fff.power.log.br     (dohraný, zabalený)
+    match-yyyyMMdd-HHmmss-fff.power.log        (jen ten právě rozehraný)
     ...
   cardart\
     BG31_035.jpg
@@ -598,6 +598,37 @@ hry.
 
 Složky `cardart` a `cards` jsou jen mezipaměti podle kapitoly 11.6. Smazat se dají kdykoli;
 aplikace si kresby i popisy stáhne znovu.
+
+### 10.2.1 Komprese a retence
+
+Syrový log jednoho zápasu má desítky megabajtů; za jeden večer hraní narostla složka na
+713 MB. Dohraný zápas se proto zabalí Brotli a rozehraný zůstává v prostém textu, protože se
+z něj po restartu obnovuje. Naměřeno na skutečném zápase o 64,4 MB:
+
+| kodek | velikost | poměr | zabalit | rozbalit |
+| --- | --- | --- | --- | --- |
+| GZip Optimal | 2,98 MB | 21,6× | 353 ms | 51 ms |
+| GZip SmallestSize | 2,86 MB | 22,5× | 796 ms | 52 ms |
+| Brotli Fastest | 3,14 MB | 20,5× | 44 ms | 56 ms |
+| **Brotli Optimal** | **2,22 MB** | **29,0×** | **152 ms** | 53 ms |
+| Brotli SmallestSize | 1,46 MB | 44,1× | 119 364 ms | 53 ms |
+
+Brotli Optimal je menší i rychlejší než kterýkoli stupeň gzipu. Nejsilnější stupeň sice dá
+44×, ale dvě minuty práce uprostřed hraní za pár megabajtů nestojí.
+
+Filtrovat log na řádky, které parser čte, se nevyplatí: ubere 29 % řádků a jen 20 % místa,
+protože objem tvoří `GameState` řádky, které se stejně potřebují. Se zabalením je rozdíl
+1,70 MB proti 2,22 MB. Za půl megabajtu na zápas nestojí za to přijít o možnost archiv znovu
+přečíst vylepšeným parserem — dnes ignorovaný řádek může zítra nést informaci navíc.
+
+Drží se posledních `MatchLogArchive.RetainedMatches` dohraných zápasů, tedy třicet. Ořez i dobalení
+pozůstalých prostých logů proběhnou při otevření archivu, takže se složka srovná i po
+aktualizaci ze starší verze nebo po pádu aplikace.
+
+Čtení řeší `MatchLogArchive.ReadMatch`, které pozná zabalený soubor podle přípony. Volající
+tak nemusí vědět, v jakém stavu zápas je.
+
+### 10.2.2 Pořadová přípona
 
 Přípona s pořadovým číslem se použije pouze při kolizi časového názvu. Soubory obsahují
 původní řádky `Power.log` náležející zápasu. Proto mohou obsahovat BattleTagy a další
@@ -1018,7 +1049,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje třicet osm testů.
+Test suite aktuálně obsahuje čtyřicet testů.
 
 Původní čtyři:
 
@@ -1071,7 +1102,10 @@ v hlášce o souboji, ohlášení týmu až s druhým vyřazeným hrdinou a udr�
 lokálního hráče na jeho slotu i tehdy, když spoluhráč bojuje první, a to, že se jedno jméno
 nikdy neobjeví na dvou řádcích tabulky zároveň.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 38 testů prošlo.
+Dva v `MatchLogArchiveTests` pokrývají kompresi: zabalení dohraného zápasu se zachováním
+obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s ořezem retence.
+
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 40 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1109,13 +1143,14 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
    fullscreenem; doporučený je borderless fullscreen.
 5. **Demo vs. live auto-detekce.** Aktivní Hearthstone může automaticky přepnout demo
    zpět do live režimu.
-6. **Neomezená retence.** Dokončené raw match logy se zatím nemažou ani nekomprimují.
+6. **Retence je jen podle počtu.** Drží se posledních třicet zápasů bez ohledu na to, kolik
+   místa zaberou. Velmi dlouhé zápasy tak můžou složku nafouknout víc, než by strop podle
+   velikosti dovolil.
 7. **Jeden globální checkpoint.** `checkpoint.json` reprezentuje naposledy použitý
    zdroj. Ruční střídání více nezávislých `Power.log` cest nemá samostatné checkpointy.
-8. **Vybrat log si zvolený soubor zároveň zaarchivuje.** Otevření staršího
-   `Power_old.log` nebo dokonce vlastního `match-*.power.log` vytvoří v `matches`
-   další kopii každého zápasu v něm a přepíše checkpoint. Na prohlížení je vhodnější
-   konzolový `--replay`, který jen čte.
+8. **Vybrat log u cizího souboru pořád archivuje.** Vlastní zápas z `matches` se pozná podle
+   přípony a jen přehraje, ale otevření cizího `Power_old.log` z něj udělá živý zdroj se vším,
+   co k tomu patří: založí archiv a přepíše checkpoint.
 9. **První import může být pomalý.** Bez validního checkpointu se aktuální zdroj musí
    jednou přečíst celý.
 10. **Konzolová větev zaostává.** Nemá match archivy, checkpoint ani přesné desktopové

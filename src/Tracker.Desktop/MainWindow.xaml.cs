@@ -14,7 +14,8 @@ public partial class MainWindow : Window
     {
         Listening,
         Demo,
-        Live
+        Live,
+        Replay
     }
 
     /// <summary>Výška, na kterou je rozložení navržené, aby se žádný panel nemusel scrollovat.</summary>
@@ -260,8 +261,10 @@ public partial class MainWindow : Window
 
     private async void RestartButton_Click(object sender, RoutedEventArgs eventArgs)
     {
-        if (mode == TrackerMode.Listening)
+        if (mode is TrackerMode.Listening or TrackerMode.Replay)
         {
+            // Ze záznamu vede cesta zpátky k živé hře jen přes naslouchání; přehrát ho znovu
+            // by ukázalo přesně totéž.
             StartListening();
         }
         else if (mode == TrackerMode.Demo)
@@ -280,16 +283,71 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Vyberte Hearthstone Power.log",
-            Filter = "Power.log|Power.log|Log soubory (*.log)|*.log|Všechny soubory (*.*)|*.*",
+            Title = "Vyberte zápas nebo Hearthstone Power.log",
+            Filter = "Zápasy a logy|*.power.log.br;*.power.log;Power.log|Uložené zápasy (*.power.log.br)|*.power.log.br|Log soubory (*.log)|*.log|Všechny soubory (*.*)|*.*",
+            InitialDirectory = Directory.Exists(MatchesDirectory) ? MatchesDirectory : null,
             CheckFileExists = true,
             Multiselect = false
         };
 
-        if (dialog.ShowDialog(this) == true)
+        if (dialog.ShowDialog(this) != true)
         {
-            await StartLiveAsync(dialog.FileName, autoDiscovered: false);
+            return;
         }
+
+        // Vlastní archiv se jen přehraje. Pouštět ho jako živý zdroj by z něj udělalo další
+        // kopii v matches a přepsalo checkpoint, který ukazuje na běžící hru.
+        if (MatchLogArchive.IsMatchArchive(dialog.FileName))
+        {
+            StartReplay(dialog.FileName);
+            return;
+        }
+
+        await StartLiveAsync(dialog.FileName, autoDiscovered: false);
+    }
+
+    /// <summary>Adresář, kam si tracker ukládá dohrané zápasy.</summary>
+    private static string MatchesDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "BattlegroundsTracker",
+        "matches");
+
+    /// <summary>
+    /// Přehraje uložený zápas jen pro čtení: nic se nearchivuje a checkpoint zůstane, kde byl.
+    /// Zabalený soubor se rozbalí za běhu.
+    /// </summary>
+    private void StartReplay(string path)
+    {
+        timer.Stop();
+        matchArchive?.Dispose();
+        matchArchive = null;
+        liveReader = null;
+        tracker = new GameStateTracker();
+        parser = new PowerLogParser();
+        mode = TrackerMode.Replay;
+        isSourceAutoDiscovered = false;
+        demoIndex = 0;
+
+        var lines = 0;
+        try
+        {
+            foreach (var line in MatchLogArchive.ReadMatch(path))
+            {
+                tracker.Apply(parser.Parse(line));
+                lines++;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException)
+        {
+            viewModel.SourceDescription = $"zápas se nepodařilo přečíst: {exception.Message}";
+            return;
+        }
+
+        viewModel.Update(tracker.State);
+        viewModel.ModeLabel = "ZÁZNAM";
+        viewModel.SourceDescription = $"{Path.GetFileName(path)} ({lines} řádků)";
+        viewModel.PauseButtonText = "Pozastavit";
+        viewModel.IsPauseEnabled = false;
     }
 
     private async Task StartLiveAsync(string path, bool autoDiscovered)

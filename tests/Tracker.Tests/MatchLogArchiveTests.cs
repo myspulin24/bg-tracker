@@ -41,7 +41,9 @@ public sealed class MatchLogArchiveTests
             using var completed = MatchLogArchive.Open(dataDirectory, sourcePath);
             Assert.False(completed.HasActiveMatch);
             Assert.Equal(84, completed.ResumePosition);
-            Assert.Single(Directory.GetFiles(completed.MatchesDirectory, "*.power.log"));
+            // Dokončený zápas se zabalil, prostý text po něm nezůstal.
+            Assert.Single(Directory.GetFiles(completed.MatchesDirectory, "*.power.log.br"));
+            Assert.Empty(Directory.GetFiles(completed.MatchesDirectory, "*.power.log"));
         }
         finally
         {
@@ -86,14 +88,101 @@ public sealed class MatchLogArchiveTests
                 startedAt = startedAt.AddSeconds(1);
             }
 
-            var files = Directory.GetFiles(archive.MatchesDirectory, "*.power.log").Order().ToArray();
+            var files = Directory.GetFiles(archive.MatchesDirectory, "*.power.log.br").Order().ToArray();
             Assert.Equal(2, files.Length);
             Assert.Equal(2, tracker.State.GamesSeen);
             Assert.False(archive.HasActiveMatch);
 
             // Každý zápas začíná vlastním CREATE_GAME a druhý nepřebral řádky prvního.
-            Assert.Equal([lines[0], lines[1]], File.ReadAllLines(files[0]));
-            Assert.Equal([lines[2], lines[3], lines[4]], File.ReadAllLines(files[1]));
+            Assert.Equal([lines[0], lines[1]], MatchLogArchive.ReadMatch(files[0]));
+            Assert.Equal([lines[2], lines[3], lines[4]], MatchLogArchive.ReadMatch(files[1]));
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void PacksTheFinishedMatchAndKeepsItReadable()
+    {
+        var testDirectory = Path.Combine(Path.GetTempPath(), $"tracker-pack-{Guid.NewGuid():N}");
+        var dataDirectory = Path.Combine(testDirectory, "data");
+        var sourcePath = Path.Combine(testDirectory, "Power.log");
+
+        try
+        {
+            Directory.CreateDirectory(testDirectory);
+            File.WriteAllText(sourcePath, "x");
+
+            // Log se hodně opakuje, takže na komprimaci reaguje stejně jako ten skutečný.
+            string[] lines = [.. Enumerable.Range(0, 5000)
+                .Select(index => $"D 18:24 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=TURN value={index}")];
+
+            string packed;
+            using (var archive = MatchLogArchive.Open(dataDirectory, sourcePath))
+            {
+                archive.StartMatch(DateTimeOffset.UnixEpoch);
+                foreach (var line in lines)
+                {
+                    archive.Append(line);
+                }
+
+                var plain = archive.ActiveMatchPath!;
+                archive.CompleteMatch();
+                packed = Directory.GetFiles(archive.MatchesDirectory, "*.power.log.br").Single();
+                Assert.False(File.Exists(plain));
+            }
+
+            // Obsah přežije zabalení beze změny a soubor je řádově menší.
+            Assert.Equal(lines, MatchLogArchive.ReadMatch(packed));
+            var original = lines.Sum(line => line.Length + Environment.NewLine.Length);
+            Assert.True(new FileInfo(packed).Length * 10 < original,
+                $"zabalený {new FileInfo(packed).Length} B není desetkrát menší než {original} B");
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void PacksLeftoverPlainLogsAndKeepsOnlyTheNewestMatches()
+    {
+        var testDirectory = Path.Combine(Path.GetTempPath(), $"tracker-prune-{Guid.NewGuid():N}");
+        var dataDirectory = Path.Combine(testDirectory, "data");
+        var matchesDirectory = Path.Combine(dataDirectory, "matches");
+        var sourcePath = Path.Combine(testDirectory, "Power.log");
+
+        try
+        {
+            Directory.CreateDirectory(matchesDirectory);
+            File.WriteAllText(sourcePath, "x");
+
+            // Zápasy z verze před kompresí; jejich jména nesou čas, takže se řadí abecedně.
+            for (var index = 0; index < MatchLogArchive.RetainedMatches + 5; index++)
+            {
+                File.WriteAllText(
+                    Path.Combine(matchesDirectory, $"match-2026090{index / 10}-{index:D6}-000.power.log"),
+                    $"zápas {index}");
+            }
+
+            using var archive = MatchLogArchive.Open(dataDirectory, sourcePath);
+
+            Assert.Empty(Directory.GetFiles(matchesDirectory, "*.power.log"));
+            var kept = Directory.GetFiles(matchesDirectory, "*.power.log.br").Order().ToArray();
+            Assert.Equal(MatchLogArchive.RetainedMatches, kept.Length);
+
+            // Smazalo se pět nejstarších, nejnovější zůstal a jde přečíst.
+            Assert.Equal(
+                [$"zápas {MatchLogArchive.RetainedMatches + 4}"],
+                MatchLogArchive.ReadMatch(kept[^1]));
         }
         finally
         {

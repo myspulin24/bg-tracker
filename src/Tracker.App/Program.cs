@@ -17,6 +17,20 @@ try
         return 0;
     }
 
+    // Uložený zápas se pozná podle přípony a čte se rovnou, včetně zabaleného.
+    if (options.LogPath is { } chosen && MatchLogArchive.IsMatchArchive(chosen) && File.Exists(chosen))
+    {
+        var replayParser = new PowerLogParser();
+        var replayTracker = new GameStateTracker();
+        foreach (var line in MatchLogArchive.ReadMatch(chosen))
+        {
+            replayTracker.Apply(replayParser.Parse(line));
+        }
+
+        ConsoleDashboard.Render(replayTracker.State, chosen, clear: false);
+        return 0;
+    }
+
     var path = options.Demo
         ? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "samples", "pilot.Power.log"))
         : PowerLogLocator.Find(options.LogPath);
