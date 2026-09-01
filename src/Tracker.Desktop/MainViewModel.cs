@@ -20,6 +20,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string diagnostics = $"{TrackerVersion.Display} • {TrackerVersion.Copyright} • 0 řádků / 0 událostí";
     private string pauseButtonText = "Pozastavit";
     private string modeLabel = "DEMO";
+    private string gameMode = "SÓLO";
     private string sourceDescription = "syntetická data";
     private bool isPauseEnabled = true;
     private string updateStatus = string.Empty;
@@ -47,6 +48,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string Diagnostics { get => diagnostics; private set => Set(ref diagnostics, value); }
     public string PauseButtonText { get => pauseButtonText; set => Set(ref pauseButtonText, value); }
     public string ModeLabel { get => modeLabel; set => Set(ref modeLabel, value); }
+
+    /// <summary>Herní režim lobby: <c>SÓLO</c>, nebo <c>DUOS</c>.</summary>
+    public string GameMode { get => gameMode; private set => Set(ref gameMode, value); }
     public string SourceDescription { get => sourceDescription; set => Set(ref sourceDescription, value); }
     public bool IsPauseEnabled { get => isPauseEnabled; set => Set(ref isPauseEnabled, value); }
 
@@ -60,39 +64,42 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void Update(TrackerState state)
     {
         var standings = state.Standings;
-        var localIndex = IndexOfLocal(standings);
 
         GameStatus = state.IsGameActive ? "Hra probíhá" : state.GamesSeen == 0 ? "Čekání" : "Hra skončila";
         Turn = state.Round?.ToString() ?? "—";
         Phase = FirstUpper(state.Phase);
         Gold = state.AvailableGold is { } available ? $"{available}/{state.Gold ?? available}" : "—";
-        Place = localIndex >= 0 ? (localIndex + 1).ToString() : "—";
+        Place = state.LocalPlace is { } localPlace ? $"{localPlace}/{state.PlaceCount}" : "—";
         TavernUpgrade = $"Upgrade tavernu: {Value(state.TavernUpgradeCost)}";
         NextOpponent = $"Další soupeř: {OpponentLabel(state)}";
         AvailableRaces = state.AvailableRaces.Count == 0
             ? "Typy v nabídce: —"
             : "Typy: " + string.Join(" · ", state.AvailableRaces.Select(MinionRace.Display));
         OpposingBoardTitle = state.IsCombatPhase ? "DESKA SOUPEŘE" : "NABÍDKA BOBA";
+        GameMode = state.IsDuos ? "DUOS" : "SÓLO";
         Result = state.FinalPlace is { } finalPlace
             ? $"{finalPlace}. místo"
             : TranslateResult(state.Result);
         Diagnostics =
             $"{TrackerVersion.Display} • {TrackerVersion.Copyright} • {state.ParsedLines} řádků / {state.RecognizedEvents} událostí";
 
-        Sync(Participants, [.. standings.Select((participant, index) => new ParticipantViewModel(
-            (index + 1).ToString(),
-            participant.HeroName ?? "Čekám na hrdinu",
-            participant.BattleTag ?? "Skrytý hráč",
-            participant.IsEliminated ? "†" : Value(participant.EffectiveHealth),
-            Value(participant.Armor),
-            Value(participant.TavernTier),
-            Value(participant.Triples),
-            TranslateStatus(participant.PlayState),
-            participant.IsLocal,
-            participant.PlayerId == state.NextOpponentPlayerId,
-            participant.IsEliminated,
-            StableBoard(participant, state),
-            BoardCaption(participant, state)))]);
+        Sync(Participants, [.. Rank(state, standings).Select(row => new ParticipantViewModel(
+            row.Place,
+            row.Participant.HeroName ?? "Čekám na hrdinu",
+            row.Participant.BattleTag ?? "Skrytý hráč",
+            row.Participant.IsEliminated ? "†" : Value(row.Participant.EffectiveHealth),
+            Value(row.Participant.Armor),
+            Value(row.Participant.TavernTier),
+            Value(row.Participant.Triples),
+            TranslateStatus(row.Participant.PlayState),
+            row.Participant.IsLocal,
+            row.Participant.IsTeammate,
+            row.Participant.PlayerId == state.NextOpponentPlayerId ||
+                (state.IsDuos && row.Participant.PlayerId == state.NextOpponentTeammatePlayerId),
+            row.Participant.IsEliminated,
+            row.IsTeamStart,
+            StableBoard(row.Participant, state),
+            BoardCaption(row.Participant, state)))]);
 
         Sync(PlayerBoard, [.. state.PlayerBoard.Select(MinionViewModel.From)]);
         Sync(OpposingBoard, [.. (state.IsCombatPhase ? state.OpponentBoard : state.Shop).Select(MinionViewModel.From)]);
@@ -123,22 +130,62 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Jeden řádek tabulky lobby i s tím, kolikáté místo a začátek kterého týmu značí.</summary>
+    private readonly record struct Row(LobbyParticipant Participant, string Place, bool IsTeamStart);
+
+    /// <summary>
+    /// Očísluje řádky tabulky. V Duos se místo rozdává týmu, ne hráči, takže se číslo píše
+    /// jen k prvnímu z dvojice; u druhého by tvrdilo, že je o příčku horší.
+    /// </summary>
+    private static IReadOnlyList<Row> Rank(TrackerState state, IReadOnlyList<LobbyParticipant> standings)
+    {
+        if (!state.IsDuos)
+        {
+            return [.. standings.Select((participant, index) => new Row(participant, $"{index + 1}", false))];
+        }
+
+        var rows = new List<Row>(standings.Count);
+        var teams = state.Teams;
+        for (var index = 0; index < teams.Count; index++)
+        {
+            for (var member = 0; member < teams[index].Count; member++)
+            {
+                rows.Add(new Row(teams[index][member], member == 0 ? $"{index + 1}" : string.Empty, member == 0));
+            }
+        }
+
+        return rows;
+    }
+
     /// <summary>
     /// U lokálního hráče je zajímavá živá deska, u soupeřů poslední, kterou log ukázal.
     /// </summary>
     private static IReadOnlyList<BoardMinion> BoardOf(LobbyParticipant participant, TrackerState state) =>
-        participant.IsLocal && state.PlayerBoard.Count > 0 ? state.PlayerBoard : participant.LastBoard;
+        IsMe(participant, state) && state.PlayerBoard.Count > 0 ? state.PlayerBoard : participant.LastBoard;
+
+    /// <summary>
+    /// Živá deska patří jedinému slotu. V Duos sdílí spoluhráč tutéž stranu desky jako lokální
+    /// hráč, takže sám příznak <c>IsLocal</c> by mu mohl podstrčit cizí sestavu.
+    /// </summary>
+    private static bool IsMe(LobbyParticipant participant, TrackerState state) =>
+        state.LocalPlayerSlot is { } slot ? participant.PlayerId == slot : participant.IsLocal;
 
     private static string BoardCaption(LobbyParticipant participant, TrackerState state)
     {
-        if (participant.IsLocal && state.PlayerBoard.Count > 0)
+        if (IsMe(participant, state) && state.PlayerBoard.Count > 0)
         {
             return "Aktuální deska";
         }
 
-        return participant.LastBoard.Count == 0
-            ? "Desku uvidíte, až proti tomuto hráči nastoupíte"
-            : $"Deska z kola {participant.LastBoardRound?.ToString() ?? "—"}";
+        if (participant.LastBoard.Count > 0)
+        {
+            return $"Deska z kola {participant.LastBoardRound?.ToString() ?? "—"}";
+        }
+
+        // Proti spoluhráči se nikdy nenastupuje, takže by slib, že se deska ukáže, nikdy neplatil.
+        return participant.IsTeammate
+            ? "Desku spoluhráče log neukazuje"
+            : "Desku uvidíte, až proti tomuto hráči nastoupíte";
     }
 
     /// <summary>
@@ -157,22 +204,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return next;
     }
 
-    private static int IndexOfLocal(IReadOnlyList<LobbyParticipant> standings)
+    private static string OpponentLabel(TrackerState state)
     {
-        for (var index = 0; index < standings.Count; index++)
-        {
-            if (standings[index].IsLocal)
-            {
-                return index;
-            }
-        }
-
-        return -1;
+        // Nastupuje se proti jednomu soupeři; druhého z dvojice bere spoluhráč. Uvádí se proto
+        // jako doplněk, ne jako druhý protivník.
+        var first = SlotLabel(state.NextOpponent, state.NextOpponentPlayerId);
+        return state.IsDuos && (state.NextOpponentTeammate is not null || state.NextOpponentTeammatePlayerId is not null)
+            ? $"{first} — v týmu s {SlotLabel(state.NextOpponentTeammate, state.NextOpponentTeammatePlayerId)}"
+            : first;
     }
 
-    private static string OpponentLabel(TrackerState state) => state.NextOpponent is { } opponent
-        ? $"{opponent.HeroName ?? "—"} · {opponent.BattleTag ?? "Skrytý hráč"}"
-        : state.NextOpponentPlayerId is { } slot
+    private static string SlotLabel(LobbyParticipant? participant, int? playerId) => participant is not null
+        ? $"{participant.HeroName ?? "—"} · {participant.BattleTag ?? "Skrytý hráč"}"
+        : playerId is { } slot
             ? $"hráč #{slot}"
             : "—";
 

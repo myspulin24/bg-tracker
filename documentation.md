@@ -356,6 +356,75 @@ soupeře z `NEXT_OPPONENT_PLAYER_ID`. Výsledek se doplňuje až v následujíc�
 - souboj, který do začátku dalšího souboje výsledek nedostane, se uzavře jako remíza.
 
 Konečné umístění se při `FINAL_GAMEOVER` bere z `PLAYER_LEADERBOARD_PLACE` lokálního hrdiny.
+Konec hry se hlásí jednou: umístěním, a jen když ho log nedá, holým výsledkem.
+
+### 8.8 Režim Duos
+
+Duos pozná tracker podle tagů `BACON_DUO_*` a přepne se do `TrackerState.IsDuos`. Osm hráčů
+tvoří čtyři dvojice a rozdávají se čtyři místa, ne osm (`PlaceCount`).
+
+| Tag | Kde | Význam |
+| --- | --- | --- |
+| `BACON_DUO_TEAM_ID` | entita hrdiny, u lokálního hráče entita hráče | tým 1 až 4 |
+| `BACON_DUO_TEAMMATE_PLAYER_ID` | entita lokálního hráče | slot spoluhráče |
+| `NEXT_OPPONENT_TEAMMATE_PLAYER_ID` | entita lokálního hráče | druhý ze soupeřící dvojice |
+
+Dvojice **nejsou sousední sloty**. V pozorovaném logu tvořily tým sloty 3 a 8, takže se
+partner bez tagu odvodit nedá. Vlastní tým navíc hra napíše jinam než u ostatních: na entitu
+hráče, ne na entitu hrdiny. `LinkLocalTeam` proto číslo doplní lokálnímu hráči i jeho
+spoluhráči, ať přišlo z kterékoli strany.
+
+I v Duos se nastupuje proti **jedinému** soupeři; druhého z dvojice si bere spoluhráč a v logu
+po jeho souboji nezůstane nic. Ověřeno měřením u prvního útoku: na soupeřově straně stojí vždy
+jen jedna deska. `NEXT_OPPONENT_TEAMMATE_PLAYER_ID` je proto doplňková informace o dvojici, ne
+druhý protivník, a hláška o souboji jmenuje jen toho, proti komu se bojovalo. Desku druhého
+z dvojice tracker uvidí až v kole, kdy proti němu nastoupí sám.
+
+Hlášky o souboji nesou číslo kola. Výsledek dorazí až v další nákupní fázi a u remízy dokonce
+až se začátkem dalšího souboje, takže by jinak visel pod nadpisem cizího kola.
+
+`PLAYER_LEADERBOARD_PLACE` nese v Duos umístění **týmu**, tedy 1 až 4, a oba spoluhráči mají
+stejné. Řadit hráče jednotlivě by dvojice roztrhalo, proto `TrackerState.Teams` seskupí lobby
+podle `TeamId`, týmy seřadí podle součtu zbývajících životů a uvnitř týmu dá dopředu lokálního
+hráče. Číslo místa se pak píše jen k prvnímu z dvojice.
+
+Tým padá až s druhým hrdinou. U prvního mrtvého spoluhráče by ohlášení umístění tvrdilo, že
+tým skončil, i když hraje dál, takže se hlásí jen `X vypadl, tým hraje dál.`
+
+### 8.9 V Duos nese HERO_ENTITY cizí hrdiny
+
+Entit hráče je v logu vždycky jen pár: lokální a jedna sdílená soupeřova. Jméno té soupeřovy
+se mění podle toho, koho klient zrovna ukazuje. V sólu to nevadí, protože se v jednom souboji
+nastupuje proti jedinému hrdinovi. V Duos jsou hrdinové dva a `HERO_ENTITY` se během souboje
+přepne na oba, ale pod jedním jménem:
+
+```text
+TAG_CHANGE Entity=Myšpulín#21600 tag=HERO_ENTITY value=682    (PLAYER_ID=2, spoluhráč)
+TAG_CHANGE Entity=Zullaman       tag=HERO_ENTITY value=686    (PLAYER_ID=8)
+TAG_CHANGE Entity=Myšpulín#21600 tag=HERO_ENTITY value=107    (PLAYER_ID=1, zpět na sebe)
+TAG_CHANGE Entity=Zullaman       tag=HERO_ENTITY value=740    (PLAYER_ID=3)
+```
+
+Bez obrany obsadil jeden BattleTag dva sloty: v tabulce se čtyřikrát opakovala stejná jména
+a skutečná jména spoluhráčů se ztratila. Proto platí, že **jeden BattleTag může vlastnit jen
+jeden slot**; druhá a další vazba téhož jména se zahodí. Na skutečném logu to dá správné
+přiřazení u šesti z osmi slotů, zbylé dva log nikdy nepojmenuje a zůstanou jako
+`Skrytý hráč`.
+
+Samo o sobě to ale nestačí, protože o vítězi rozhoduje pořadí v logu. Kdo z dvojice bojuje
+první, řídí `BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT`, a když jde první spoluhráč, dorazí
+`HERO_ENTITY` na jeho hrdinu dřív než na vlastního. Spoluhráč by tak zabral jméno i slot
+lokálního hráče, dostal příznak `IsLocal`, a s ním i cizí živou desku. Vlastní BattleTag
+proto smí obsadit jen slot, jehož `PLAYER_ID` sedí na entitu lokálního hráče.
+
+Ze stejného důvodu se živá deska nepřiřazuje podle `IsLocal`, ale podle `LocalPlayerSlot`:
+spoluhráč sdílí v Duos tutéž stranu desky (`CONTROLLER`) jako lokální hráč, takže samotný
+příznak je na rozlišení příliš slabý.
+
+Deska spoluhráče se v logu samostatně neobjeví. Ověřeno měřením: mimo souboj je na straně
+lokálního hráče vždycky nanejvýš sedm minionů, tedy jen vlastní deska. Podokno u spoluhráče
+to říká rovnou, místo aby slibovalo desku, až proti němu uživatel nastoupí — proti
+spoluhráči se nenastupuje nikdy.
 
 ## 9. Klíčové poznatky z reálného Battlegrounds logu
 
@@ -656,7 +725,10 @@ nadpisy. Název hrdiny a BattleTag se při nedostatku šířky oříznou ellipsi
 
 Nad tabulkou je ještě řádek s typy minionů, které se objevily v nabídce Boba.
 
-Řádek lobby je barevně odlišený: modrý pro lokálního hráče, okrový pro dalšího soupeře.
+Řádek lobby je barevně odlišený: modrý pro lokálního hráče, zelený pro spoluhráče v Duos,
+okrový pro dalšího soupeře. V Duos jsou dvojice oddělené mezerou a číslo místa se píše jen
+k prvnímu z nich, protože místo patří týmu; podrobnosti v kapitole 8.8. Karta `MÍSTO` ukazuje
+`3/4` v Duos a `5/8` v sólu a v hlavičce okna přibude vedle režimu čtení popisek `DUOS`.
 Vyřazený hráč je ztlumený, má lebku před jménem hrdiny a místo HP křížek.
 
 Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče. Miniony
@@ -946,7 +1018,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje třicet jedna testů.
+Test suite aktuálně obsahuje třicet osm testů.
 
 Původní čtyři:
 
@@ -993,7 +1065,13 @@ Devět v `CardTextTests` pokrývá popisy karet: šest případů úklidu znače
 jen battlegroundských karet s textem, čtení uložené kopie místo dalšího stahování a použití
 i prošlé kopie, když se stažení nepovede.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 31 testů prošlo.
+Sedm v `DuosTests` pokrývá režim Duos: rozpoznání a spárování dvojic z tagů, řazení týmů se
+zachováním dvojic pohromadě, pravidlo jeden BattleTag = jeden slot, pojmenování obou soupeřů
+v hlášce o souboji, ohlášení týmu až s druhým vyřazeným hrdinou a udržení identity
+lokálního hráče na jeho slotu i tehdy, když spoluhráč bojuje první, a to, že se jedno jméno
+nikdy neobjeví na dvou řádcích tabulky zároveň.
+
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 38 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1061,19 +1139,22 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
     přesunutí nebo resize se mezi relacemi neukládají.
 18. **Sbalení desek se nepamatuje.** Na nižším monitoru se sekce sbalí sama při každém
     startu, ruční volba se ale mezi spuštěními neukládá.
-19. **Soukromí logů.** Vlastní archivy mohou obsahovat BattleTagy a další syrová data;
+19. **Jména spoluhráčů v Duos nejsou vždy k mání.** Log pojmenuje jen hráče, jejichž entita
+    se v něm objevila; ostatní zůstanou jako `Skrytý hráč`. Ve zkoumaném zápase šlo o dva
+    sloty z osmi. Deska spoluhráče v logu není vůbec, podokno u něj proto zůstane prázdné.
+20. **Soukromí logů.** Vlastní archivy mohou obsahovat BattleTagy a další syrová data;
     nemají se automaticky sdílet bez kontroly.
-20. **Kresby a popisy karet potřebují internet.** Aplikace kvůli nim chodí na cizí servery
+21. **Kresby a popisy karet potřebují internet.** Aplikace kvůli nim chodí na cizí servery
     (`art.hearthstonejson.com` a `api.hearthstonejson.com`). Neposílá o uživateli nic než
     Card ID a `User-Agent`, ale je to druhé místo po kontrole aktualizací, kde tracker sahá
     ven. Bez sítě a bez naplněné mezipaměti se kartičky vykreslí jen s údaji z logu.
-21. **Kresba nebo popis nemusí existovat.** Zdroj je nezávislý na Blizzardu a u čerstvě
+22. **Kresba nebo popis nemusí existovat.** Zdroj je nezávislý na Blizzardu a u čerstvě
     vydaných karet může zaostávat. Kartička to snese, jen bude bez obrázku nebo bez popisu.
     Popisy jsou navíc jen anglicky; databáze má i jiné jazyky, ale tracker si bere `enUS`.
-22. **Popis je z databáze, ne z rozehrané partie.** Ukazuje text vytištěný na kartě.
+23. **Popis je z databáze, ne z rozehrané partie.** Ukazuje text vytištěný na kartě.
     Nezohledňuje, co s minionem udělaly buffy nebo trinkety; skutečné jsou jen statistiky
     a klíčová slova, které tracker čte z logu.
-23. **Dekódované obrázky se z paměti neuvolňují.** `CardCache` je drží po celý běh
+24. **Dekódované obrázky se z paměti neuvolňují.** `CardCache` je drží po celý běh
     aplikace. Jedna kresba zabere zhruba 260 kB, takže dlouhá relace s mnoha různými
     kartami paměť pozvolna zvedá.
 

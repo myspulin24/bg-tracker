@@ -263,7 +263,7 @@
                             <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                 <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" Margin="0,0,6,0" />
                                 <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10">
-                                    <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
+                                    <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding GameMode, Mode=OneWay}" FontWeight="Bold" Foreground="#E6A23C" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
                                 </TextBlock>
                             </StackPanel>
                         </StackPanel>
@@ -354,7 +354,7 @@
                         <ItemsControl ItemsSource="{Binding Participants}" MinHeight="328" Margin="0,4,0,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border CornerRadius="5" Padding="9,4" Margin="0,0,0,3" Height="38"
+                                    <Border CornerRadius="5" Padding="9,4" Margin="{Binding RowMargin}" Height="38"
                                             ToolTipService.InitialShowDelay="180" ToolTipService.ShowDuration="120000"
                                             ToolTipService.Placement="Left" ToolTipService.HorizontalOffset="-6">
                                         <Border.ToolTip>
@@ -378,6 +378,9 @@
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsNextOpponent}" Value="True">
                                                         <Setter Property="Background" Value="#33281A" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsTeammate}" Value="True">
+                                                        <Setter Property="Background" Value="#1A3A34" />
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding IsLocal}" Value="True">
                                                         <Setter Property="Background" Value="#1B3048" />

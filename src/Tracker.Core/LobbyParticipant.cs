@@ -6,6 +6,15 @@ public sealed class LobbyParticipant(int playerId)
     public int PlayerId { get; } = playerId;
 
     public bool IsLocal { get; internal set; }
+
+    /// <summary>
+    /// Tým 1 až 4 v režimu Duos z tagu <c>BACON_DUO_TEAM_ID</c>. Dvojice není tvořená sousedními
+    /// sloty, takže se bez tohoto tagu odvodit nedá.
+    /// </summary>
+    public int? TeamId { get; internal set; }
+
+    /// <summary>Spoluhráč lokálního hráče podle <c>BACON_DUO_TEAMMATE_PLAYER_ID</c>.</summary>
+    public bool IsTeammate { get; internal set; }
     public string? BattleTag { get; internal set; }
     public string? HeroName { get; internal set; }
     public string? HeroCardId { get; internal set; }
@@ -14,7 +23,10 @@ public sealed class LobbyParticipant(int playerId)
     public int? Damage { get; internal set; }
     public int? TavernTier { get; internal set; }
 
-    /// <summary>Živé pořadí z tagu <c>PLAYER_LEADERBOARD_PLACE</c>; po konci hry jde o konečné umístění.</summary>
+    /// <summary>
+    /// Živé pořadí z tagu <c>PLAYER_LEADERBOARD_PLACE</c>; po konci hry jde o konečné umístění.
+    /// V režimu Duos jde o umístění týmu, tedy 1 až 4, a oba spoluhráči mají stejné.
+    /// </summary>
     public int? LeaderboardPlace { get; internal set; }
 
     /// <summary>Počet dosažených triplů z tagu <c>PLAYER_TRIPLES</c>.</summary>

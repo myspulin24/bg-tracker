@@ -25,7 +25,10 @@ internal static class ConsoleDashboard
         builder.AppendLine(new string('=', 72));
         builder.AppendLine($"Zdroj:  {source}");
         builder.AppendLine($"Stav:   {(state.IsGameActive ? "hra probíhá" : "čekání / hra skončila")}");
-        builder.AppendLine($"Režim:  {(state.BattlegroundsSignalSeen ? "Battlegrounds rozpoznán" : "zatím nepotvrzen")}");
+        var mode = state.BattlegroundsSignalSeen
+            ? state.IsDuos ? "Battlegrounds Duos" : "Battlegrounds sólo"
+            : "zatím nepotvrzen";
+        builder.AppendLine($"Režim:  {mode}");
         builder.AppendLine($"Kolo:   {state.Round?.ToString() ?? "—"} (tah {state.Turn?.ToString() ?? "—"})");
         builder.AppendLine($"Fáze:   {state.Phase}");
         builder.AppendLine($"Zlato:  {Gold(state)}");
@@ -73,13 +76,17 @@ internal static class ConsoleDashboard
             builder.AppendLine("  (zatím žádní hráči)");
         }
 
+        var places = Places(state, lobby);
         for (var index = 0; index < lobby.Count; index++)
         {
             var participant = lobby[index];
             var marker = participant.IsEliminated
                 ? '☠'
-                : participant.IsLocal ? '>' : participant.PlayerId == state.NextOpponentPlayerId ? '*' : ' ';
-            var place = (index + 1).ToString().PadLeft(2);
+                : participant.IsLocal ? '>'
+                : participant.IsTeammate ? '+'
+                : participant.PlayerId == state.NextOpponentPlayerId ||
+                  (state.IsDuos && participant.PlayerId == state.NextOpponentTeammatePlayerId) ? '*' : ' ';
+            var place = places[index].PadLeft(2);
             var hero = Truncate(participant.HeroName ?? "—", 26).PadRight(26);
             var tag = Truncate(participant.BattleTag ?? "Skrytý hráč", 21).PadRight(21);
             var health = (participant.IsEliminated ? "†" : participant.EffectiveHealth?.ToString() ?? "—").PadLeft(3);
@@ -90,6 +97,36 @@ internal static class ConsoleDashboard
         }
 
         builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Čísla míst pro řádky tabulky. V Duos se místo rozdává týmu, takže se píše jen k prvnímu
+    /// z dvojice; u druhého by tvrdilo, že je o příčku horší.
+    /// </summary>
+    private static string[] Places(TrackerState state, IReadOnlyList<LobbyParticipant> lobby)
+    {
+        var places = new string[lobby.Count];
+        if (!state.IsDuos)
+        {
+            for (var index = 0; index < lobby.Count; index++)
+            {
+                places[index] = (index + 1).ToString();
+            }
+
+            return places;
+        }
+
+        var row = 0;
+        var teams = state.Teams;
+        for (var team = 0; team < teams.Count; team++)
+        {
+            for (var member = 0; member < teams[team].Count && row < places.Length; member++)
+            {
+                places[row++] = member == 0 ? (team + 1).ToString() : string.Empty;
+            }
+        }
+
+        return places;
     }
 
     private static void AppendBoard(StringBuilder builder, string title, IReadOnlyList<BoardMinion> minions)
@@ -163,9 +200,17 @@ internal static class ConsoleDashboard
         ? $"{available}/{state.Gold ?? available}"
         : "—";
 
-    private static string OpponentLabel(TrackerState state) => state.NextOpponent is { } opponent
-        ? $"{opponent.HeroName ?? "—"} ({opponent.BattleTag ?? "Skrytý hráč"})"
-        : state.NextOpponentPlayerId is { } slot
+    private static string OpponentLabel(TrackerState state)
+    {
+        var first = SlotLabel(state.NextOpponent, state.NextOpponentPlayerId);
+        return state.IsDuos && (state.NextOpponentTeammate is not null || state.NextOpponentTeammatePlayerId is not null)
+            ? $"{first} — v týmu s {SlotLabel(state.NextOpponentTeammate, state.NextOpponentTeammatePlayerId)}"
+            : first;
+    }
+
+    private static string SlotLabel(LobbyParticipant? participant, int? playerId) => participant is not null
+        ? $"{participant.HeroName ?? "—"} ({participant.BattleTag ?? "Skrytý hráč"})"
+        : playerId is { } slot
             ? $"hráč #{slot}"
             : "—";
 

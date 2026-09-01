@@ -23,10 +23,14 @@ public sealed partial class GameStateTracker
     private readonly Dictionary<string, string> cardNames = new(StringComparer.Ordinal);
     private readonly Dictionary<int, int> leaderboardHeroes = [];
     private readonly HashSet<int> eliminatedSlots = [];
+    private CombatRound? announcedCombat;
+    private string? announcedCombatMessage;
+    private int? localTeamId;
     private int? localPlayerId;
     private int? localPlayerEntityId;
     private int? announcedRound;
     private bool combatBoardsCaptured;
+    private bool announcedGameOver;
 
     public TrackerState State { get; } = new();
 
@@ -237,13 +241,14 @@ public sealed partial class GameStateTracker
                 participant.PlayState = value;
                 if (value is "WON" or "LOST" or "TIED")
                 {
+                    // Jen za sebe. Entita hráče na soupeřově straně mění jméno podle toho, koho
+                    // klient zrovna ukazuje, takže by hláška ukazovala na náhodného hráče.
                     if (State.LocalPlayerEntity is not null &&
                         entity.Equals(State.LocalPlayerEntity, StringComparison.Ordinal))
                     {
+                        // Konec hry ohlásí CompleteGame; umístění řekne víc než holý výsledek.
                         State.Result = value;
                     }
-
-                    State.AddEvent($"{entity}: {ResultName(value)}.");
                 }
                 break;
             case "PLAYER_LEADERBOARD_PLACE" or "PLAYER_TRIPLES":
@@ -279,6 +284,11 @@ public sealed partial class GameStateTracker
                 return TryRegisterOfferedRace(entity);
             case "PLAYER_ID" when entity.IsHero && TryInt(value, out var lobbyPlayerId):
                 entity.LobbyPlayerId = lobbyPlayerId;
+                return true;
+            case "BACON_DUO_TEAM_ID" when TryInt(value, out var teamId) && teamId > 0:
+                entity.DuoTeamId = teamId;
+                State.IsDuos = true;
+                SyncLobbyHero(entity);
                 return true;
             case "ZONE":
                 entity.Zone = value;
@@ -350,6 +360,11 @@ public sealed partial class GameStateTracker
                                                 entity.ControllerId == State.LocalControllerId:
                 State.NextOpponentPlayerId = nextOpponent > 0 ? nextOpponent : null;
                 return true;
+            case "NEXT_OPPONENT_TEAMMATE_PLAYER_ID" when TryInt(value, out var opponentMate) &&
+                                                        entity.ControllerId == State.LocalControllerId:
+                State.NextOpponentTeammatePlayerId = opponentMate > 0 ? opponentMate : null;
+                State.IsDuos = true;
+                return true;
             default:
                 return false;
         }
@@ -376,6 +391,27 @@ public sealed partial class GameStateTracker
                 return true;
             case "MAXRESOURCES":
                 State.MaxGold = numeric;
+                return true;
+            case "BACON_DUO_TEAMMATE_PLAYER_ID" when numeric > 0:
+                State.TeammatePlayerId = numeric;
+                State.IsDuos = true;
+                MarkTeammate(numeric);
+                LinkLocalTeam();
+                return true;
+            case "BACON_DUO_TEAM_ID" when numeric > 0:
+                // Vlastní tým hra napíše na entitu hráče, ne na hrdinu jako u ostatních.
+                localTeamId = numeric;
+                State.IsDuos = true;
+                LinkLocalTeam();
+                return true;
+            // Entita hráče je pro dvojici soupeřů spolehlivější než entita hrdiny: hrdina se
+            // každý souboj přegeneruje a jeho CONTROLLER nemusí být v tu chvíli ještě nastavený.
+            case "NEXT_OPPONENT_PLAYER_ID":
+                State.NextOpponentPlayerId = numeric > 0 ? numeric : null;
+                return true;
+            case "NEXT_OPPONENT_TEAMMATE_PLAYER_ID":
+                State.NextOpponentTeammatePlayerId = numeric > 0 ? numeric : null;
+                State.IsDuos = true;
                 return true;
             case "BACON_WON_LAST_COMBAT" when numeric != 0:
                 return RecordCombatWin();
@@ -424,7 +460,33 @@ public sealed partial class GameStateTracker
         var combat = State.CombatHistory[^1];
         combat.Outcome = "WON";
         combat.DamageTaken ??= 0;
-        State.AddEvent($"Souboj s {OpponentLabel(combat)}: výhra.");
+        return AnnounceCombat(combat);
+    }
+
+    /// <summary>
+    /// Ohlásí souboj, nebo předchozí hlášku o témže souboji přepíše. V Duos dorazí výsledek
+    /// i poškození po částech, jak dobojuje každý ze spoluhráčů, a bez přepisu by v panelu
+    /// zůstaly dvě protichůdné věty o jednom souboji.
+    /// </summary>
+    private bool AnnounceCombat(CombatRound combat)
+    {
+        // Výsledek souboje dorazí až v další nákupní fázi, u remízy dokonce až se začátkem
+        // dalšího souboje. Bez čísla kola by hláška visela pod cizím nadpisem.
+        var damage = combat.DamageTaken is > 0 ? $", −{combat.DamageTaken} HP" : string.Empty;
+        var round = combat.Round is { } number ? $"Kolo {number} · s" : "S";
+        var message = $"{round}ouboj s {OpponentLabel(combat)}: {ResultName(combat.Outcome)}{damage}.";
+        if (ReferenceEquals(announcedCombat, combat) &&
+            string.Equals(State.LastEvent, announcedCombatMessage, StringComparison.Ordinal))
+        {
+            State.ReplaceLastEvent(message);
+        }
+        else
+        {
+            State.AddEvent(message);
+        }
+
+        announcedCombat = combat;
+        announcedCombatMessage = message;
         return true;
     }
 
@@ -447,8 +509,7 @@ public sealed partial class GameStateTracker
 
         combat.DamageTaken = damage;
         combat.Outcome ??= "LOST";
-        State.AddEvent($"Souboj s {OpponentLabel(combat)}: {ResultName(combat.Outcome)}, −{damage} HP.");
-        return true;
+        return AnnounceCombat(combat);
     }
 
     private bool SetCombatPhase(bool inCombat)
@@ -483,6 +544,16 @@ public sealed partial class GameStateTracker
             combat.OpponentBattleTag = opponent.BattleTag;
         }
 
+        if (State.IsDuos)
+        {
+            combat.OpponentTeammatePlayerId = State.NextOpponentTeammatePlayerId;
+            if (State.NextOpponentTeammate is { } opponentMate)
+            {
+                combat.OpponentTeammateHeroName = opponentMate.HeroName;
+                combat.OpponentTeammateBattleTag = opponentMate.BattleTag;
+            }
+        }
+
         State.BeginCombat(combat);
         return true;
     }
@@ -502,7 +573,7 @@ public sealed partial class GameStateTracker
         var previous = State.CombatHistory[^1];
         previous.Outcome = "TIED";
         previous.DamageTaken ??= 0;
-        State.AddEvent($"Souboj s {OpponentLabel(previous)}: remíza.");
+        AnnounceCombat(previous);
     }
 
     /// <summary>
@@ -551,10 +622,21 @@ public sealed partial class GameStateTracker
         State.IsGameActive = false;
         State.IsCombatPhase = false;
         State.CurrentCombat = null;
+        if (announcedGameOver)
+        {
+            return;
+        }
+
+        announcedGameOver = true;
         if (State.LocalParticipant?.LeaderboardPlace is { } place)
         {
             State.FinalPlace = place;
-            State.AddEvent($"Konec hry: {place}. místo.");
+            var team = State.IsDuos ? " s týmem" : string.Empty;
+            State.AddEvent($"Konec hry{team}: {place}. místo z {State.PlaceCount}.");
+        }
+        else
+        {
+            State.AddEvent($"Konec hry: {ResultName(State.Result)}.");
         }
     }
 
@@ -594,9 +676,92 @@ public sealed partial class GameStateTracker
         _ => value.ToLowerInvariant()
     };
 
-    private static string OpponentLabel(CombatRound combat) =>
-        combat.OpponentBattleTag ?? combat.OpponentHeroName ??
-        (combat.OpponentPlayerId is { } slot ? $"hráčem #{slot}" : "neznámým soupeřem");
+    /// <summary>
+    /// Popisek souboje. I v Duos se nastupuje proti jedinému soupeři; druhého z dvojice si bere
+    /// spoluhráč a v logu po něm nezůstane ani stopa. Uvádět obě jména by tvrdilo, že se bojovalo
+    /// proti oběma.
+    /// </summary>
+    private string OpponentLabel(CombatRound combat) =>
+        SlotLabel(combat.OpponentPlayerId, combat.OpponentBattleTag, combat.OpponentHeroName);
+
+    private string SlotLabel(int? playerId, string? battleTag, string? heroName)
+    {
+        var participant = State.Slot(playerId);
+        return battleTag ?? participant?.BattleTag ?? heroName ?? participant?.HeroName ??
+               (playerId is { } slot ? $"hráč #{slot}" : "neznámý soupeř");
+    }
+
+    /// <summary>Jméno slotu do hlášky o vyřazení; BattleTag je čitelnější než jméno hrdiny.</summary>
+    private static string ParticipantLabel(LobbyParticipant participant) =>
+        participant.BattleTag ?? participant.HeroName ?? $"hráč #{participant.PlayerId}";
+
+    /// <summary>
+    /// Zapíše slotu BattleTag a udrží tabulku vlastnictví přesnou. Když slot jméno mění, musí
+    /// se to staré uvolnit, jinak by zůstalo zapsané na slotu, který ho už nezobrazuje, a nikde
+    /// jinde by se pak uchytit nemohlo.
+    /// </summary>
+    private void AssignBattleTag(LobbyParticipant participant, string battleTag)
+    {
+        if (participant.BattleTag is { } previous && !previous.Equals(battleTag, StringComparison.Ordinal) &&
+            battleTagLobbyPlayers.TryGetValue(previous, out var previousSlot) &&
+            previousSlot == participant.PlayerId)
+        {
+            battleTagLobbyPlayers.Remove(previous);
+        }
+
+        participant.BattleTag = battleTag;
+        battleTagLobbyPlayers[battleTag] = participant.PlayerId;
+    }
+
+    /// <summary>
+    /// Vlastní BattleTag smí obsadit jen slot, jehož <c>PLAYER_ID</c> sedí na entitu lokálního
+    /// hráče. V Duos totiž hra pověsí <c>HERO_ENTITY</c> lokální entity i na hrdinu spoluhráče,
+    /// a pokud spoluhráč bojuje první, stihne slot zabrat dřív než skutečný majitel. Pak by
+    /// spoluhráč vystupoval jako lokální hráč včetně cizí desky.
+    /// </summary>
+    private bool OwnsLocalIdentity(string battleTag, int lobbyPlayerId) =>
+        localPlayerId is not { } localSlot ||
+        !battleTag.Equals(State.LocalPlayerEntity, StringComparison.Ordinal) ||
+        lobbyPlayerId == localSlot;
+
+    /// <summary>Oba hrdiny téhož týmu; mimo Duos jen hráče samotného.</summary>
+    private IReadOnlyList<LobbyParticipant> TeamOf(LobbyParticipant participant) =>
+        participant.TeamId is { } teamId
+            ? [.. State.LobbyParticipants.Where(member => member.TeamId == teamId)]
+            : [participant];
+
+    private void MarkTeammate(int playerId)
+    {
+        foreach (var participant in State.LobbyParticipants)
+        {
+            participant.IsTeammate = participant.PlayerId == playerId;
+        }
+    }
+
+    /// <summary>
+    /// Doplní číslo týmu lokálnímu hráči a jeho spoluhráči. Jeden z nich ho v logu mít nemusí:
+    /// vlastní tým hra píše na entitu hráče, kdežto u ostatních na entitu hrdiny.
+    /// </summary>
+    private void LinkLocalTeam()
+    {
+        var local = State.Slot(State.LocalPlayerSlot);
+        var mate = State.Slot(State.TeammatePlayerId);
+        var teamId = localTeamId ?? local?.TeamId ?? mate?.TeamId;
+        if (teamId is not { } team)
+        {
+            return;
+        }
+
+        if (local is not null)
+        {
+            local.TeamId = team;
+        }
+
+        if (mate is not null)
+        {
+            mate.TeamId = team;
+        }
+    }
 
     private static bool TryInt(string value, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
@@ -620,6 +785,10 @@ public sealed partial class GameStateTracker
         eliminatedSlots.Clear();
         localPlayerId = null;
         localPlayerEntityId = null;
+        announcedCombat = null;
+        announcedCombatMessage = null;
+        localTeamId = null;
+        announcedGameOver = false;
         announcedRound = null;
         combatBoardsCaptured = false;
     }
@@ -797,6 +966,9 @@ public sealed partial class GameStateTracker
         var participant = State.LobbyParticipant(lobbyPlayerId);
         participant.HeroName = BaseName(entity.Name);
         participant.HeroCardId = entity.CardId ?? participant.HeroCardId;
+        participant.TeamId ??= entity.DuoTeamId;
+        participant.IsTeammate |= State.TeammatePlayerId == lobbyPlayerId;
+        LinkLocalTeam();
         if (OwnsLobbyStats(entity, lobbyPlayerId))
         {
             participant.Health = entity.Health ?? participant.Health;
@@ -808,19 +980,22 @@ public sealed partial class GameStateTracker
             participant.PlayState = entity.PlayState ?? participant.PlayState;
         }
 
-        if (heroOwners.TryGetValue(entity.EntityId, out var battleTag))
+        // Jeden BattleTag může patřit jen jednomu slotu. V Duos hra přepíná HERO_ENTITY jedné
+        // entity hráče mezi oběma hrdiny týmu, takže by jinak jedno jméno obsadilo dva sloty
+        // a skutečná jména spoluhráčů by se ztratila.
+        if (heroOwners.TryGetValue(entity.EntityId, out var battleTag) &&
+            (!battleTagLobbyPlayers.TryGetValue(battleTag, out var ownedSlot) || ownedSlot == lobbyPlayerId) &&
+            OwnsLocalIdentity(battleTag, lobbyPlayerId))
         {
-            participant.BattleTag = battleTag;
-            battleTagLobbyPlayers[battleTag] = lobbyPlayerId;
+            AssignBattleTag(participant, battleTag);
             participant.IsLocal = State.LocalPlayerEntity is not null &&
                                   battleTag.Equals(State.LocalPlayerEntity, StringComparison.Ordinal);
         }
         else if (localPlayerId == entity.ControllerId && localPlayerId == lobbyPlayerId &&
                  State.LocalPlayerEntity is { } localBattleTag)
         {
-            participant.BattleTag = localBattleTag;
+            AssignBattleTag(participant, localBattleTag);
             participant.IsLocal = true;
-            battleTagLobbyPlayers[localBattleTag] = lobbyPlayerId;
         }
 
         if (participant.IsLocal)
@@ -839,10 +1014,28 @@ public sealed partial class GameStateTracker
             return;
         }
 
-        var label = participant.BattleTag ?? participant.HeroName ?? $"hráč #{participant.PlayerId}";
-        State.AddEvent(participant.LeaderboardPlace is { } place
-            ? $"{label} vypadl na {place}. místě."
-            : $"{label} vypadl.");
+        var label = ParticipantLabel(participant);
+        if (!State.IsDuos)
+        {
+            State.AddEvent(participant.LeaderboardPlace is { } place
+                ? $"{label} vypadl na {place}. místě."
+                : $"{label} vypadl.");
+            return;
+        }
+
+        // V Duos padá tým až s druhým hrdinou a PLAYER_LEADERBOARD_PLACE nese umístění týmu.
+        // Ohlásit ho u prvního mrtvého spoluhráče by tvrdilo, že tým skončil, i když hraje dál.
+        var team = TeamOf(participant);
+        if (team.All(member => member.IsEliminated))
+        {
+            var names = string.Join(" + ", team.Select(ParticipantLabel));
+            State.AddEvent(participant.LeaderboardPlace is { } teamPlace
+                ? $"Tým {names} vypadl na {teamPlace}. místě."
+                : $"Tým {names} vypadl.");
+            return;
+        }
+
+        State.AddEvent($"{label} vypadl, tým hraje dál.");
     }
 
     private int? ResolveLobbySlot(string entity, int? entityId)

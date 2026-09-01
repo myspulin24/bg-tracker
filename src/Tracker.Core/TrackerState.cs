@@ -58,7 +58,19 @@ public sealed class TrackerState
     /// <summary>Slot dalšího soupeře z tagu <c>NEXT_OPPONENT_PLAYER_ID</c>.</summary>
     public int? NextOpponentPlayerId { get; internal set; }
 
-    /// <summary>Konečné umístění lokálního hráče, 1 až 8.</summary>
+    /// <summary>Slot spoluhráče dalšího soupeře z tagu <c>NEXT_OPPONENT_TEAMMATE_PLAYER_ID</c>.</summary>
+    public int? NextOpponentTeammatePlayerId { get; internal set; }
+
+    /// <summary>Režim Duos, poznaný podle tagů <c>BACON_DUO_*</c>.</summary>
+    public bool IsDuos { get; internal set; }
+
+    /// <summary>Slot spoluhráče lokálního hráče z tagu <c>BACON_DUO_TEAMMATE_PLAYER_ID</c>.</summary>
+    public int? TeammatePlayerId { get; internal set; }
+
+    /// <summary>Kolik míst se v této lobby rozdává: osm v sólu, čtyři v Duos.</summary>
+    public int PlaceCount => IsDuos ? 4 : 8;
+
+    /// <summary>Konečné umístění lokálního hráče; v Duos jde o umístění týmu.</summary>
     public int? FinalPlace { get; internal set; }
 
     /// <summary>
@@ -101,7 +113,72 @@ public sealed class TrackerState
     /// pod nimi vyřazení podle svého konečného umístění. Tag <c>PLAYER_LEADERBOARD_PLACE</c> se
     /// v logu obnovuje po dávkách, takže by sám o sobě pořadí chvílemi ukazoval zastaralé.
     /// </summary>
-    public IReadOnlyList<LobbyParticipant> Standings =>
+    public IReadOnlyList<LobbyParticipant> Standings => IsDuos ? DuoStandings : SoloStandings;
+
+    /// <summary>
+    /// Žebříček po týmech. V Duos nesou oba spoluhráči stejné <c>PLAYER_LEADERBOARD_PLACE</c>,
+    /// takže řadit hráče jednotlivě by dvojice roztrhalo. Týmy se proto řadí podle součtu
+    /// zbývajících životů a uvnitř týmu jde první lokální hráč.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<LobbyParticipant>> Teams =>
+    [
+        .. lobbyParticipants.Values
+            .GroupBy(participant => participant.TeamId ?? -participant.PlayerId)
+            .Select(team => (IReadOnlyList<LobbyParticipant>)
+            [
+                .. team
+                    .OrderByDescending(participant => participant.IsLocal)
+                    .ThenByDescending(participant => participant.IsTeammate)
+                    .ThenBy(participant => participant.PlayerId)
+            ])
+            .OrderBy(team => team.All(participant => participant.IsEliminated))
+            // Vyřazené týmy řadí dosažené umístění. Zbývající životy jsou u nich záporné podle
+            // toho, jak velkou ranou tým padl, což s pořadím nesouvisí.
+            .ThenBy(team => team.All(participant => participant.IsEliminated)
+                ? team.Min(participant => participant.LeaderboardPlace ?? int.MaxValue)
+                : 0)
+            .ThenByDescending(team => team.Sum(participant => participant.RemainingHealth ?? 0))
+            .ThenBy(team => team.Min(participant => participant.PlayerId))
+    ];
+
+    /// <summary>
+    /// Pořadí lokálního hráče, respektive jeho týmu. Počítá se ze stejného řazení, jaké vidí
+    /// uživatel v tabulce, aby si číslo v hlavičce a pozice v seznamu neodporovaly.
+    /// </summary>
+    public int? LocalPlace
+    {
+        get
+        {
+            if (IsDuos)
+            {
+                var teams = Teams;
+                for (var index = 0; index < teams.Count; index++)
+                {
+                    if (teams[index].Any(participant => participant.IsLocal))
+                    {
+                        return index + 1;
+                    }
+                }
+
+                return null;
+            }
+
+            var standings = SoloStandings;
+            for (var index = 0; index < standings.Count; index++)
+            {
+                if (standings[index].IsLocal)
+                {
+                    return index + 1;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    private IReadOnlyList<LobbyParticipant> DuoStandings => [.. Teams.SelectMany(team => team)];
+
+    private IReadOnlyList<LobbyParticipant> SoloStandings =>
     [
         .. lobbyParticipants.Values
             .Where(participant => !participant.IsEliminated)
@@ -119,7 +196,16 @@ public sealed class TrackerState
             ? participant
             : lobbyParticipants.Values.FirstOrDefault(candidate => candidate.IsLocal);
 
-    public LobbyParticipant? NextOpponent => NextOpponentPlayerId is { } slot &&
+    public LobbyParticipant? NextOpponent => Slot(NextOpponentPlayerId);
+
+    /// <summary>Druhý z dvojice, proti které se v Duos nastupuje.</summary>
+    public LobbyParticipant? NextOpponentTeammate => Slot(NextOpponentTeammatePlayerId);
+
+    /// <summary>Spoluhráč lokálního hráče v Duos.</summary>
+    public LobbyParticipant? Teammate => Slot(TeammatePlayerId);
+
+    /// <summary>Hráč na daném slotu lobby, nebo <c>null</c>, pokud ho log ještě neodhalil.</summary>
+    public LobbyParticipant? Slot(int? playerId) => playerId is { } slot &&
         lobbyParticipants.TryGetValue(slot, out var participant)
             ? participant
             : null;
@@ -175,6 +261,9 @@ public sealed class TrackerState
         MaxGold = null;
         TavernUpgradeCost = null;
         NextOpponentPlayerId = null;
+        NextOpponentTeammatePlayerId = null;
+        IsDuos = false;
+        TeammatePlayerId = null;
         FinalPlace = null;
         CurrentCombat = null;
         participants.Clear();
@@ -233,6 +322,28 @@ public sealed class TrackerState
         {
             recentEvents.Dequeue();
         }
+    }
+
+    /// <summary>
+    /// Přepíše poslední událost místo přidání nové. V Duos přijde poškození ze souboje na dvakrát,
+    /// jak dobojuje každý ze spoluhráčů, a dvě hlášky o témže souboji pak panel jen zaplevelí.
+    /// </summary>
+    internal void ReplaceLastEvent(string message)
+    {
+        if (recentEvents.Count == 0)
+        {
+            AddEvent(message);
+            return;
+        }
+
+        var kept = recentEvents.ToArray();
+        recentEvents.Clear();
+        for (var index = 0; index < kept.Length - 1; index++)
+        {
+            recentEvents.Enqueue(kept[index]);
+        }
+
+        AddEvent(message);
     }
 
     private IReadOnlyList<BoardMinion> Board(int? controllerId) => controllerId is not { } controller

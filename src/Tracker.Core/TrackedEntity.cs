@@ -20,6 +20,9 @@ public sealed class TrackedEntity(int entityId)
     /// <summary>Hodnota tagu <c>PLAYER_ID</c> na hrdinovi, tedy slot 1 až 8 v lobby.</summary>
     public int? LobbyPlayerId { get; internal set; }
 
+    /// <summary>Tým 1 až 4 z tagu <c>BACON_DUO_TEAM_ID</c>; mimo režim Duos zůstává prázdný.</summary>
+    public int? DuoTeamId { get; internal set; }
+
     public int? Attack { get; internal set; }
     public int? Health { get; internal set; }
     public int? Armor { get; internal set; }
