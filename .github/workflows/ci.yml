@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Release build musí projít bez varování, protože Directory.Build.props
+      # zapíná TreatWarningsAsErrors.
+      - run: dotnet build HearthstoneBattlegroundsTracker.sln -c Release
+      - run: dotnet test HearthstoneBattlegroundsTracker.sln -c Release --no-build
+      - run: dotnet format HearthstoneBattlegroundsTracker.sln --verify-no-changes --no-restore

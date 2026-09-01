@@ -1,0 +1,11 @@
+bin/
+obj/
+artifacts/
+.vs/
+*.user
+*.suo
+
+# Zbytky po aktualizaci vedle publikovaného .exe
+*.exe.new
+*.exe.old
+*.exe.new.part

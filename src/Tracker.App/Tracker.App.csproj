@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>HearthstoneBattlegroundsTracker</AssemblyName>
+    <ApplicationIcon>..\..\assets\bg-tracker.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tracker.Core\Tracker.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="samples\pilot.Power.log">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

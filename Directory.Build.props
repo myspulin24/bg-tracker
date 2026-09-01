@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Jediné místo, kde se verze a autorství udržují. Odsud je dědí AssemblyVersion,
+       FileVersion i InformationalVersion, takže sedí v UI i ve vlastnostech souboru .exe. -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Product>Battlegrounds Tracker</Product>
+    <Authors>Michal Jašek</Authors>
+    <Company>Michal Jašek</Company>
+    <Copyright>© 2026 Michal Jašek</Copyright>
+  </PropertyGroup>
+</Project>

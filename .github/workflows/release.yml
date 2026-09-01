@@ -1,0 +1,60 @@
+name: release
+
+# Vydání se spouští tagem, například `git tag v0.2.0 && git push origin v0.2.0`.
+# Číslo z tagu se propíše do sestavení, takže se verze v aplikaci nemůže rozejít s vydáním.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Odvodit verzi z tagu
+        id: version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = $tag -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { $version = '0.0.0' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Sestavit a otestovat
+        run: |
+          dotnet build HearthstoneBattlegroundsTracker.sln -c Release -p:Version=${{ steps.version.outputs.version }}
+          dotnet test HearthstoneBattlegroundsTracker.sln -c Release --no-build
+          dotnet format HearthstoneBattlegroundsTracker.sln --verify-no-changes --no-restore
+
+      - name: Publikovat overlay
+        shell: pwsh
+        run: |
+          dotnet publish src\Tracker.Desktop\Tracker.Desktop.csproj `
+            -c Release -r win-x64 --self-contained true -o publish `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none
+          $exe = 'publish\BattlegroundsTracker.exe'
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  BattlegroundsTracker.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
+          Write-Host "SHA256: $hash"
+
+      - name: Vytvořit vydání
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/BattlegroundsTracker.exe
+            publish/BattlegroundsTracker.exe.sha256
+          generate_release_notes: true

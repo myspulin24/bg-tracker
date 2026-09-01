@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>BattlegroundsTracker</AssemblyName>
+    <ApplicationIcon>..\..\assets\bg-tracker.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tracker.Core\Tracker.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Stejný soubor slouží jako ikona .exe i jako ikona okna v hlavním panelu. -->
+    <Resource Include="..\..\assets\bg-tracker.ico" Link="Assets\bg-tracker.ico" />
+  </ItemGroup>
+</Project>

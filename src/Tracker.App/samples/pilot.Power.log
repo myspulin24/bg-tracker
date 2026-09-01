@@ -1,0 +1,10 @@
+D 17:42:01.0000000 PowerTaskList.DebugPrintPower() - CREATE_GAME
+D 17:42:01.0100000 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=GAMEMODE value=BACON
+D 17:42:01.0200000 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Pilotní hráč id=2 zone=PLAY zonePos=0 cardId= player=1] tag=HEALTH value=30
+D 17:42:01.0300000 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Pilotní hráč id=2 zone=PLAY zonePos=0 cardId= player=1] tag=ARMOR value=7
+D 17:42:01.0400000 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Pilotní hráč id=2 zone=PLAY zonePos=0 cardId= player=1] tag=PLAYER_TECH_LEVEL value=3
+D 17:42:01.0500000 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Soupeř id=3 zone=PLAY zonePos=0 cardId= player=2] tag=HEALTH value=25
+D 17:42:01.0600000 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Soupeř id=3 zone=PLAY zonePos=0 cardId= player=2] tag=PLAYER_TECH_LEVEL value=4
+D 17:42:01.0700000 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=TURN value=7
+D 17:42:01.0800000 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_ACTION
+D 17:42:01.0900000 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Pilotní hráč id=2 zone=PLAY zonePos=0 cardId= player=1] tag=DAMAGE value=6
