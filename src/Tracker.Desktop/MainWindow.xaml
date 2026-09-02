@@ -49,7 +49,11 @@
                     <Ellipse Fill="#0C121C" />
                     <Ellipse>
                         <Ellipse.Fill>
-                            <ImageBrush ImageSource="{Binding Card.Image}" Stretch="UniformToFill" />
+                            <!-- Kresba je čtvercová a po vepsání do oválu koukaly v okrajích její
+                                 světlé kraje. Viewbox z ní bere jen prostředních 74 %, o kousek
+                                 výš, protože postava na kartě sedí v horní polovině. -->
+                            <ImageBrush ImageSource="{Binding Card.Image}" Stretch="UniformToFill"
+                                        Viewbox="0.13,0.09,0.74,0.74" ViewboxUnits="RelativeToBoundingBox" />
                         </Ellipse.Fill>
                     </Ellipse>
                     <Ellipse StrokeThickness="3.5">
@@ -238,298 +242,301 @@
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
     </Window.Resources>
-    <Border Background="#F20B1019" BorderBrush="#536987" BorderThickness="1" CornerRadius="12">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="64" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Border Grid.Row="0" Background="#FA101825" CornerRadius="11,11,0,0" BorderBrush="#26344A" BorderThickness="0,0,0,1">
-                <Grid Margin="16,0,10,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" MouseLeftButtonDown="DragArea_MouseLeftButtonDown">
-                        <Border Width="30" Height="30" CornerRadius="7" Background="#111A28" BorderBrush="#536987"
-                                BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center">
-                            <TextBlock Text="BG" Foreground="{StaticResource Accent}" FontSize="14" FontWeight="Bold"
-                                       ToolTip="{Binding Diagnostics}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel>
-                            <TextBlock Text="BATTLEGROUNDS TRACKER" FontSize="14" FontWeight="Bold" />
-                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10" MaxWidth="330"
-                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding SourceTooltip}">
-                                    <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding GameMode, Mode=OneWay}" FontWeight="Bold" Foreground="#E6A23C" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
-                                </TextBlock>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="CollapseButton" Content="−" ToolTip="Sbalit overlay" Click="CollapseButton_Click"
-                                Width="34" Height="32" Padding="0" FontSize="18" />
-                        <Button Content="×" ToolTip="Ukončit tracker" Click="CloseButton_Click"
-                                Width="34" Height="32" Padding="0" FontSize="19" Margin="7,0,0,0"
-                                Background="#47242A" BorderBrush="#75404A" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Grid x:Name="ContentPanel" Grid.Row="1" Margin="16,14,16,14">
+    <Viewbox Stretch="Uniform">
+        <Border x:Name="RootCard" Width="500" Height="1163"
+                Background="#F20B1019" BorderBrush="#536987" BorderThickness="1" CornerRadius="12">
+            <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="9" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="9" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="9" />
-                    <!-- Rezervuje šest řádků událostí; víc místa dostane, když okno zvětšíte. -->
-                    <RowDefinition Height="*" MinHeight="159" />
-                    <RowDefinition Height="9" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="64" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="7" />
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="7" />
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="7" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="9,6">
-                        <StackPanel>
-                            <TextBlock Text="KOLO" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="{Binding Turn}" FontSize="19" FontWeight="Bold" Foreground="{StaticResource Accent}" />
+                <Border Grid.Row="0" Background="#FA101825" CornerRadius="11,11,0,0" BorderBrush="#26344A" BorderThickness="0,0,0,1">
+                    <Grid Margin="16,0,10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" MouseLeftButtonDown="DragArea_MouseLeftButtonDown">
+                            <Border Width="30" Height="30" CornerRadius="7" Background="#111A28" BorderBrush="#536987"
+                                    BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <TextBlock Text="BG" Foreground="{StaticResource Accent}" FontSize="14" FontWeight="Bold"
+                                           ToolTip="{Binding Diagnostics}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel>
+                                <TextBlock Text="BATTLEGROUNDS TRACKER" FontSize="14" FontWeight="Bold" />
+                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                    <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10" MaxWidth="330"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding SourceTooltip}">
+                                        <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding GameMode, Mode=OneWay}" FontWeight="Bold" Foreground="#E6A23C" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-                    </Border>
-                    <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="9,6">
-                        <StackPanel>
-                            <TextBlock Text="MÍSTO" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="{Binding Place}" FontSize="19" FontWeight="Bold" Foreground="{StaticResource Positive}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="CollapseButton" Content="−" ToolTip="Sbalit overlay" Click="CollapseButton_Click"
+                                    Width="34" Height="32" Padding="0" FontSize="18" />
+                            <Button Content="×" ToolTip="Ukončit tracker" Click="CloseButton_Click"
+                                    Width="34" Height="32" Padding="0" FontSize="19" Margin="7,0,0,0"
+                                    Background="#47242A" BorderBrush="#75404A" />
                         </StackPanel>
-                    </Border>
-                    <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="9,6">
-                        <StackPanel>
-                            <TextBlock Text="ZLATO" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="{Binding Gold}" FontSize="19" FontWeight="Bold" Foreground="#F4D06F" />
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="6" Style="{StaticResource CardStyle}" Padding="9,6">
-                        <StackPanel>
-                            <TextBlock Text="FÁZE" Style="{StaticResource SectionTitleStyle}" />
-                            <TextBlock Text="{Binding Phase}" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0"
-                                       TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="12,10">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding NextOpponent}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="1" Text="{Binding TavernUpgrade}" Foreground="{StaticResource SecondaryText}"
-                                       FontSize="10" Margin="8,1,0,0" />
-                        </Grid>
-                        <TextBlock Text="{Binding AvailableRaces}" Foreground="{StaticResource SecondaryText}" FontSize="10"
-                                   Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
-                                   ToolTip="Typy minionů, které se v této lobby objevily v nabídce Boba" />
-                        <Grid Margin="9,8,9,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="32" />
-                                <ColumnDefinition Width="40" /><ColumnDefinition Width="30" /><ColumnDefinition Width="42" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="#" Style="{StaticResource ColumnTitleStyle}" HorizontalAlignment="Left" />
-                            <TextBlock Grid.Column="1" Text="HRDINA / BATTLETAG" Style="{StaticResource ColumnTitleStyle}" HorizontalAlignment="Left" />
-                            <TextBlock Grid.Column="2" Text="HP" Style="{StaticResource ColumnTitleStyle}" />
-                            <TextBlock Grid.Column="3" Text="ARMOR" Style="{StaticResource ColumnTitleStyle}" />
-                            <TextBlock Grid.Column="4" Text="TIER" Style="{StaticResource ColumnTitleStyle}" />
-                            <TextBlock Grid.Column="5" Text="TRIPLE" Style="{StaticResource ColumnTitleStyle}" ToolTip="Počet dosažených triplů" />
-                        </Grid>
-                        <ItemsControl ItemsSource="{Binding Participants}" MinHeight="328" Margin="0,4,0,0">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border CornerRadius="5" Padding="9,4" Margin="{Binding RowMargin}" Height="38"
-                                            ToolTipService.InitialShowDelay="180" ToolTipService.ShowDuration="120000"
-                                            ToolTipService.Placement="Left" ToolTipService.HorizontalOffset="-6">
-                                        <Border.ToolTip>
-                                            <ToolTip MaxWidth="1120">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding HeroName}" FontWeight="Bold" FontSize="12"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding BattleTag}" Foreground="{StaticResource SecondaryText}"
-                                                               FontSize="10" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding BoardCaption}" Foreground="{StaticResource Accent}"
-                                                               FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap" />
-                                                    <ItemsControl ItemsSource="{Binding Board}" Style="{StaticResource MinionCardsStyle}"
-                                                                  Margin="0,7,0,0"
-                                                                  Visibility="{Binding HasBoard, Converter={StaticResource BoolToVisibility}}" />
-                                                </StackPanel>
-                                            </ToolTip>
-                                        </Border.ToolTip>
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#192433" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsNextOpponent}" Value="True">
-                                                        <Setter Property="Background" Value="#33281A" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsTeammate}" Value="True">
-                                                        <Setter Property="Background" Value="#1A3A34" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsLocal}" Value="True">
-                                                        <Setter Property="Background" Value="#1B3048" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsEliminated}" Value="True">
-                                                        <Setter Property="Opacity" Value="0.45" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="32" />
-                                                <ColumnDefinition Width="40" /><ColumnDefinition Width="30" /><ColumnDefinition Width="42" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Place}" FontSize="13" FontWeight="Bold"
-                                                       Foreground="{StaticResource SecondaryText}" VerticalAlignment="Center" />
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="☠" FontSize="12" Margin="0,0,5,0" Foreground="#E0736E"
-                                                               ToolTip="Hráč je vyřazený"
-                                                               Visibility="{Binding IsEliminated, Converter={StaticResource BoolToVisibility}}" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding HeroName}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
-                                                </Grid>
-                                                <TextBlock Text="{Binding BattleTag}" Foreground="{StaticResource SecondaryText}" FontSize="9" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="{Binding Health}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FA7B72" FontWeight="Bold" />
-                                            <TextBlock Grid.Column="3" Text="{Binding Armor}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#A9C8EA" />
-                                            <TextBlock Grid.Column="4" Text="{Binding Tier}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource Accent}" FontWeight="Bold" />
-                                            <TextBlock Grid.Column="5" Text="{Binding Triples}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource SecondaryText}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-
-                <!-- Na nižším monitoru je tahle sekce první na sbalení; ušetří skoro 300 px. -->
-                <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="12,10">
-                    <StackPanel>
-                        <Button Click="ToggleBoardsButton_Click" HorizontalContentAlignment="Stretch"
-                                Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
-                                ToolTip="Skrýt nebo zobrazit desky">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="BoardsChevron" Text="▾" Style="{StaticResource SectionTitleStyle}"
-                                           Margin="0,0,6,0" />
-                                <TextBlock x:Name="BoardsHeader" Grid.Column="1" Text="MOJE DESKA"
-                                           Style="{StaticResource SectionTitleStyle}" />
-                            </Grid>
-                        </Button>
-                        <StackPanel x:Name="BoardsContent" Grid.IsSharedSizeScope="True">
-                            <ItemsControl ItemsSource="{Binding PlayerBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
-                            <TextBlock Text="{Binding OpposingBoardTitle}" Style="{StaticResource SectionTitleStyle}" Margin="0,9,0,0" />
-                            <ItemsControl ItemsSource="{Binding OpposingBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Jediný scrollovatelný panel. Drží posledních osm událostí, a proto musí zůstat
-                     interaktivní, jinak by kolečko ani scrollbar nefungovaly. -->
-                <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="12,10">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" /><RowDefinition Height="6" /><RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="POSLEDNÍ UDÁLOSTI" Style="{StaticResource SectionTitleStyle}" />
-                        <ListBox Grid.Row="2" ItemsSource="{Binding Events}" Background="Transparent" BorderThickness="0"
-                                 Focusable="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,0,0,5" />
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Focusable" Value="False" />
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="ListBoxItem">
-                                                <ContentPresenter />
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="11" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                        <Ellipse Width="5" Height="5" Fill="{StaticResource Accent}" VerticalAlignment="Top" Margin="0,6,0,0" />
-                                        <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource SecondaryText}" FontSize="11" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
                     </Grid>
                 </Border>
 
-                <Grid Grid.Row="8">
+                <Grid x:Name="ContentPanel" Grid.Row="1" Margin="16,14,16,14">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                        <RowDefinition Height="7" /><RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="9" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="9" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="9" />
+                        <!-- Rezervuje šest řádků událostí; víc místa dostane, když okno zvětšíte. -->
+                        <RowDefinition Height="*" MinHeight="159" />
+                        <RowDefinition Height="9" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <StackPanel Grid.Row="0">
-                        <Border Background="#1E2E1F" BorderBrush="#3C6B40" BorderThickness="1" CornerRadius="6"
-                                Padding="10,6" Margin="0,0,0,7"
-                                Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="7" />
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="7" />
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="7" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="9,6">
+                            <StackPanel>
+                                <TextBlock Text="KOLO" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="{Binding Turn}" FontSize="19" FontWeight="Bold" Foreground="{StaticResource Accent}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="9,6">
+                            <StackPanel>
+                                <TextBlock Text="MÍSTO" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="{Binding Place}" FontSize="19" FontWeight="Bold" Foreground="{StaticResource Positive}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="9,6">
+                            <StackPanel>
+                                <TextBlock Text="ZLATO" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="{Binding Gold}" FontSize="19" FontWeight="Bold" Foreground="#F4D06F" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="6" Style="{StaticResource CardStyle}" Padding="9,6">
+                            <StackPanel>
+                                <TextBlock Text="FÁZE" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="{Binding Phase}" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="12,10">
+                        <StackPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding UpdateStatus}" FontSize="11" VerticalAlignment="Center"
-                                           TextWrapping="Wrap" />
-                                <Button Grid.Column="1" Content="Restartovat" Click="RestartForUpdateButton_Click"
-                                        Margin="8,0,0,0" Padding="9,4" FontSize="11"
-                                        Visibility="{Binding IsUpdateReady, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding NextOpponent}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{Binding TavernUpgrade}" Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10" Margin="8,1,0,0" />
                             </Grid>
-                        </Border>
-                        <Border Background="#1B2838" BorderBrush="#3A5878" BorderThickness="1" CornerRadius="6"
-                                Padding="10,7" Margin="0,0,0,7"
-                                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel>
-                                <TextBlock Text="{Binding LoadStatus}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                                <ProgressBar Value="{Binding LoadProgress, Mode=OneWay}" Minimum="0" Maximum="100"
-                                             Height="6" Margin="0,6,0,0" Background="#11202F" BorderThickness="0"
-                                             Foreground="{StaticResource Accent}" />
+                            <TextBlock Text="{Binding AvailableRaces}" Foreground="{StaticResource SecondaryText}" FontSize="10"
+                                       Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                       ToolTip="Typy minionů, které se v této lobby objevily v nabídce Boba" />
+                            <Grid Margin="9,8,9,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="32" />
+                                    <ColumnDefinition Width="40" /><ColumnDefinition Width="30" /><ColumnDefinition Width="42" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="#" Style="{StaticResource ColumnTitleStyle}" HorizontalAlignment="Left" />
+                                <TextBlock Grid.Column="1" Text="HRDINA / BATTLETAG" Style="{StaticResource ColumnTitleStyle}" HorizontalAlignment="Left" />
+                                <TextBlock Grid.Column="2" Text="HP" Style="{StaticResource ColumnTitleStyle}" />
+                                <TextBlock Grid.Column="3" Text="ARMOR" Style="{StaticResource ColumnTitleStyle}" />
+                                <TextBlock Grid.Column="4" Text="TIER" Style="{StaticResource ColumnTitleStyle}" />
+                                <TextBlock Grid.Column="5" Text="TRIPLE" Style="{StaticResource ColumnTitleStyle}" ToolTip="Počet dosažených triplů" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Participants}" MinHeight="328" Margin="0,4,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="5" Padding="9,4" Margin="{Binding RowMargin}" Height="38"
+                                                ToolTipService.InitialShowDelay="180" ToolTipService.ShowDuration="120000"
+                                                ToolTipService.Placement="Left" ToolTipService.HorizontalOffset="-6">
+                                            <Border.ToolTip>
+                                                <ToolTip MaxWidth="1120">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding HeroName}" FontWeight="Bold" FontSize="12"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding BattleTag}" Foreground="{StaticResource SecondaryText}"
+                                                                   FontSize="10" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding BoardCaption}" Foreground="{StaticResource Accent}"
+                                                                   FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                                        <ItemsControl ItemsSource="{Binding Board}" Style="{StaticResource MinionCardsStyle}"
+                                                                      Margin="0,7,0,0"
+                                                                      Visibility="{Binding HasBoard, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Border.ToolTip>
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#192433" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsNextOpponent}" Value="True">
+                                                            <Setter Property="Background" Value="#33281A" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsTeammate}" Value="True">
+                                                            <Setter Property="Background" Value="#1A3A34" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsLocal}" Value="True">
+                                                            <Setter Property="Background" Value="#1B3048" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsEliminated}" Value="True">
+                                                            <Setter Property="Opacity" Value="0.45" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="32" />
+                                                    <ColumnDefinition Width="40" /><ColumnDefinition Width="30" /><ColumnDefinition Width="42" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Place}" FontSize="13" FontWeight="Bold"
+                                                           Foreground="{StaticResource SecondaryText}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="☠" FontSize="12" Margin="0,0,5,0" Foreground="#E0736E"
+                                                                   ToolTip="Hráč je vyřazený"
+                                                                   Visibility="{Binding IsEliminated, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding HeroName}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding BattleTag}" Foreground="{StaticResource SecondaryText}" FontSize="9" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding Health}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FA7B72" FontWeight="Bold" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Armor}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#A9C8EA" />
+                                                <TextBlock Grid.Column="4" Text="{Binding Tier}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource Accent}" FontWeight="Bold" />
+                                                <TextBlock Grid.Column="5" Text="{Binding Triples}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource SecondaryText}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Na nižším monitoru je tahle sekce první na sbalení; ušetří skoro 300 px. -->
+                    <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="12,10">
+                        <StackPanel>
+                            <Button Click="ToggleBoardsButton_Click" HorizontalContentAlignment="Stretch"
+                                    Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                    ToolTip="Skrýt nebo zobrazit desky">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="BoardsChevron" Text="▾" Style="{StaticResource SectionTitleStyle}"
+                                               Margin="0,0,6,0" />
+                                    <TextBlock x:Name="BoardsHeader" Grid.Column="1" Text="MOJE DESKA"
+                                               Style="{StaticResource SectionTitleStyle}" />
+                                </Grid>
+                            </Button>
+                            <StackPanel x:Name="BoardsContent" Grid.IsSharedSizeScope="True">
+                                <ItemsControl ItemsSource="{Binding PlayerBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
+                                <TextBlock Text="{Binding OpposingBoardTitle}" Style="{StaticResource SectionTitleStyle}" Margin="0,9,0,0" />
+                                <ItemsControl ItemsSource="{Binding OpposingBoard}" Style="{StaticResource MinionListStyle}" Margin="0,5,0,0" />
                             </StackPanel>
-                        </Border>
-                    </StackPanel>
-                    <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                        <TextBlock FontSize="11">
-                            <Run Text="{Binding GameStatus, Mode=OneWay}" /><Run Text=" • výsledek: " /><Run Text="{Binding Result, Mode=OneWay}" />
-                        </TextBlock>
-                        <TextBlock Text="{Binding Diagnostics}" Foreground="{StaticResource SecondaryText}" FontSize="10" Margin="0,2,0,0" />
-                    </StackPanel>
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Content="Vybrat log" Click="SelectLogButton_Click" Margin="0,0,7,0" Padding="10,6" FontSize="11" />
-                        <Button Content="Spustit demo" Click="DemoButton_Click" Margin="0,0,7,0" Padding="10,6" FontSize="11" />
-                        <Button Content="{Binding PauseButtonText}" IsEnabled="{Binding IsPauseEnabled}" Click="PauseButton_Click" MinWidth="84" Padding="10,6" FontSize="11" />
-                        <Button Content="Restart" Click="RestartButton_Click" Margin="7,0,0,0" Padding="10,6" FontSize="11" />
-                    </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Jediný scrollovatelný panel. Drží posledních osm událostí, a proto musí zůstat
+                         interaktivní, jinak by kolečko ani scrollbar nefungovaly. -->
+                    <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="12,10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" /><RowDefinition Height="6" /><RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="POSLEDNÍ UDÁLOSTI" Style="{StaticResource SectionTitleStyle}" />
+                            <ListBox Grid.Row="2" ItemsSource="{Binding Events}" Background="Transparent" BorderThickness="0"
+                                     Focusable="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0,0,0,5" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Focusable" Value="False" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter />
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="11" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <Ellipse Width="5" Height="5" Fill="{StaticResource Accent}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                                            <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource SecondaryText}" FontSize="11" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                            <RowDefinition Height="7" /><RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                            <Border Background="#1E2E1F" BorderBrush="#3C6B40" BorderThickness="1" CornerRadius="6"
+                                    Padding="10,6" Margin="0,0,0,7"
+                                    Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding UpdateStatus}" FontSize="11" VerticalAlignment="Center"
+                                               TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Content="Restartovat" Click="RestartForUpdateButton_Click"
+                                            Margin="8,0,0,0" Padding="9,4" FontSize="11"
+                                            Visibility="{Binding IsUpdateReady, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+                            </Border>
+                            <Border Background="#1B2838" BorderBrush="#3A5878" BorderThickness="1" CornerRadius="6"
+                                    Padding="10,7" Margin="0,0,0,7"
+                                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding LoadStatus}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                    <ProgressBar Value="{Binding LoadProgress, Mode=OneWay}" Minimum="0" Maximum="100"
+                                                 Height="6" Margin="0,6,0,0" Background="#11202F" BorderThickness="0"
+                                                 Foreground="{StaticResource Accent}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                            <TextBlock FontSize="11">
+                                <Run Text="{Binding GameStatus, Mode=OneWay}" /><Run Text=" • výsledek: " /><Run Text="{Binding Result, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock Text="{Binding Diagnostics}" Foreground="{StaticResource SecondaryText}" FontSize="10" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Vybrat log" Click="SelectLogButton_Click" Margin="0,0,7,0" Padding="10,6" FontSize="11" />
+                            <Button Content="Spustit demo" Click="DemoButton_Click" Margin="0,0,7,0" Padding="10,6" FontSize="11" />
+                            <Button Content="{Binding PauseButtonText}" IsEnabled="{Binding IsPauseEnabled}" Click="PauseButton_Click" MinWidth="84" Padding="10,6" FontSize="11" />
+                            <Button Content="Restart" Click="RestartButton_Click" Margin="7,0,0,0" Padding="10,6" FontSize="11" />
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Grid>
-        </Grid>
-    </Border>
+        </Border>
+    </Viewbox>
 </Window>

@@ -167,11 +167,12 @@ public sealed class DuosTests
             GameState + "TAG_CHANGE Entity=Hráč#21600 tag=DAMAGE_DEALT_TO_HERO_LAST_TURN value=14"
         ]);
 
-        // Nastupuje se proti jedinému soupeři, druhého z dvojice si bere spoluhráč. V hlášce
-        // je proto jen ten, proti komu se doopravdy bojovalo, a číslo kola kvůli opožděnému výsledku.
+        // Nastupuje se proti jedinému soupeři, druhého z dvojice si bere spoluhráč. V hlášce je
+        // proto jen ten, proti komu se doopravdy bojovalo, jmenovaný hrdinou, a číslo kola kvůli
+        // opožděnému výsledku.
         var events = tracker.State.RecentEvents.ToArray();
-        Assert.Equal("Kolo 4 · souboj s Soupeř: prohra, −14 HP.", events[^1]);
-        Assert.DoesNotContain(events[..^1], message => message.Contains("Souboj", StringComparison.Ordinal));
+        Assert.Equal("Kolo 4 · tým vs A. F. Kay: prohra, dostal jsem 14 dmg.", events[^1]);
+        Assert.DoesNotContain(events[..^1], message => message.Contains(" vs ", StringComparison.Ordinal));
     }
 
     [Fact]

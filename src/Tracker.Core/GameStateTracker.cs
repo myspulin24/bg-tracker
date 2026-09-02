@@ -310,6 +310,7 @@ public sealed partial class GameStateTracker
                 return true;
             case "DAMAGE" when TryInt(value, out var damage):
                 entity.Damage = damage;
+                RecordDamageDealt(entity, damage);
                 return true;
             case "COST" when TryInt(value, out var cost):
                 entity.Cost = cost;
@@ -472,15 +473,16 @@ public sealed partial class GameStateTracker
     {
         // Výsledek souboje dorazí až v další nákupní fázi, u remízy dokonce až se začátkem
         // dalšího souboje. Bez čísla kola by hláška visela pod cizím nadpisem.
-        var damage = combat.DamageTaken is > 0 ? $", −{combat.DamageTaken} HP" : string.Empty;
-        var round = combat.Round is { } number ? $"Kolo {number} · s" : "S";
-        var message = $"{round}ouboj s {OpponentLabel(combat)}: {ResultName(combat.Outcome)}{damage}.";
-        if (ReferenceEquals(announcedCombat, combat) &&
-            string.Equals(State.LastEvent, announcedCombatMessage, StringComparison.Ordinal))
+        var round = combat.Round is { } number ? $"Kolo {number} · " : string.Empty;
+        var who = State.IsDuos ? "tým" : "já";
+        var message = $"{round}{who} vs {OpponentLabel(combat)}: {ResultName(combat.Outcome)}{DamageSummary(combat)}.";
+        if (string.Equals(message, announcedCombatMessage, StringComparison.Ordinal))
         {
-            State.ReplaceLastEvent(message);
+            return false;
         }
-        else
+
+        if (!ReferenceEquals(announcedCombat, combat) || announcedCombatMessage is null ||
+            !State.UpdateEvent(announcedCombatMessage, message))
         {
             State.AddEvent(message);
         }
@@ -554,6 +556,7 @@ public sealed partial class GameStateTracker
             }
         }
 
+        combat.OpponentDamageAtStart = State.Slot(combat.OpponentPlayerId)?.Damage ?? 0;
         State.BeginCombat(combat);
         return true;
     }
@@ -682,18 +685,55 @@ public sealed partial class GameStateTracker
     /// proti oběma.
     /// </summary>
     private string OpponentLabel(CombatRound combat) =>
-        SlotLabel(combat.OpponentPlayerId, combat.OpponentBattleTag, combat.OpponentHeroName);
+        SlotLabel(combat.OpponentPlayerId, combat.OpponentHeroName, combat.OpponentBattleTag);
 
-    private string SlotLabel(int? playerId, string? battleTag, string? heroName)
+    private string SlotLabel(int? playerId, string? heroName, string? battleTag)
     {
         var participant = State.Slot(playerId);
-        return battleTag ?? participant?.BattleTag ?? heroName ?? participant?.HeroName ??
+        return heroName ?? participant?.HeroName ?? battleTag ?? participant?.BattleTag ??
                (playerId is { } slot ? $"hráč #{slot}" : "neznámý soupeř");
     }
 
-    /// <summary>Jméno slotu do hlášky o vyřazení; BattleTag je čitelnější než jméno hrdiny.</summary>
+    /// <summary>
+    /// Jméno do hlášek. Hrdina se pamatuje lépe než BattleTag a v Duos ho log dokonce zná
+    /// i u hráčů, jejichž jméno nikdy neodhalí.
+    /// </summary>
     private static string ParticipantLabel(LobbyParticipant participant) =>
-        participant.BattleTag ?? participant.HeroName ?? $"hráč #{participant.PlayerId}";
+        participant.HeroName ?? participant.BattleTag ?? $"hráč #{participant.PlayerId}";
+
+    /// <summary>
+    /// Zapíše, kolik souboj uštědřil soupeři. Log dané poškození nehlásí, ale soupeřovu hrdinovi
+    /// během souboje roste tag <c>DAMAGE</c>; jeho přírůstek od začátku souboje je právě ono.
+    /// Nulování na začátku kola se ignoruje, jinak by přírůstek vyšel záporně.
+    /// </summary>
+    private void RecordDamageDealt(TrackedEntity entity, int damage)
+    {
+        // Bere se poslední souboj, ne jen ten právě běžící: poškození soupeře dorazí do logu
+        // až po přepnutí fáze zpátky na nákup, stejně jako to vlastní.
+        if (!entity.IsHero || State.CombatHistory.Count == 0)
+        {
+            return;
+        }
+
+        var combat = State.CombatHistory[^1];
+        if (entity.LobbyPlayerId != combat.OpponentPlayerId)
+        {
+            return;
+        }
+
+        var dealt = damage - combat.OpponentDamageAtStart;
+        if (dealt <= (combat.DamageDealt ?? 0))
+        {
+            return;
+        }
+
+        combat.DamageDealt = dealt;
+        if (combat.Outcome is not null)
+        {
+            // Výsledek už byl ohlášený, takže se hláška jen doplní o dané poškození.
+            AnnounceCombat(combat);
+        }
+    }
 
     /// <summary>
     /// Zapíše slotu BattleTag a udrží tabulku vlastnictví přesnou. Když slot jméno mění, musí
@@ -729,6 +769,20 @@ public sealed partial class GameStateTracker
         participant.TeamId is { } teamId
             ? [.. State.LobbyParticipants.Where(member => member.TeamId == teamId)]
             : [participant];
+
+    /// <summary>
+    /// Doplněk hlášky o souboji: kolik poškození padlo na kterou stranu. U remízy nepadlo nic,
+    /// takže se nepíše nic.
+    /// </summary>
+    private static string DamageSummary(CombatRound combat)
+    {
+        if (combat.DamageTaken is > 0)
+        {
+            return $", dostal jsem {combat.DamageTaken} dmg";
+        }
+
+        return combat.DamageDealt is > 0 ? $", dal jsem {combat.DamageDealt} dmg" : string.Empty;
+    }
 
     private void MarkTeammate(int playerId)
     {

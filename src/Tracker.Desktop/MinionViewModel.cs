@@ -23,8 +23,8 @@ public sealed record MinionViewModel(
     public static MinionViewModel From(BoardMinion minion) => new(
         minion.ZonePosition.ToString(),
         minion.Name,
-        minion.Attack?.ToString() ?? "—",
-        minion.Health?.ToString() ?? "—",
+        StatFormat.Compact(minion.Attack),
+        StatFormat.Compact(minion.Health),
         minion.TechLevel?.ToString() ?? "—",
         minion.Keywords,
         minion.Race is { } race ? MinionRace.Display(race) : string.Empty,

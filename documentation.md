@@ -711,7 +711,35 @@ Běžné topmost WPF okno funguje spolehlivě nad windowed nebo borderless fulls
 Nad exkluzivním fullscreen režimem Windows nemusí overlay zobrazit. To je omezení typu
 okna, nikoli parseru.
 
-### 11.2 Výchozí velikost a pravidlo bez scrollu
+### 11.2 Poměrová velikost a pravidlo bez scrollu
+
+Rozložení se sází v návrhových jednotkách 500 × 1163 a celý obsah je zabalený do `Viewbox`
+se `Stretch="Uniform"`. Okno se pak nastaví na návrhovou velikost vynásobenou zvětšením, takže
+overlay zabere stejný podíl obrazovky na FullHD i na 4K a nic se neořezává ani nescrolluje.
+
+Zvětšení se počítá z **výšky pracovní plochy**, ne z počtu pixelů:
+
+```text
+zvětšení = clamp(výška pracovní plochy × 0,94 / návrhová výška, 0,70, 1,30)
+```
+
+Pixely by byly špatná míra, protože `SystemParameters.WorkArea` je v jednotkách nezávislých na
+DPI. Na 4K se 200% zvětšením Windows už jednou zvětšily samy a druhé násobení podle pixelů by
+overlay nafouklo na dvojnásobek. Naměřené hodnoty:
+
+| pracovní plocha | zvětšení | okno |
+| --- | --- | --- |
+| 900 (malý notebook) | 0,73 | 364 × 846 |
+| 1040 (FullHD) | 0,84 | 420 × 978 |
+| 1392 | 1,13 | 563 × 1308 |
+| 1800 (4K při 100 %) | 1,30 | 650 × 1512 |
+
+Meze zvětšení jsou tam kvůli čitelnosti: bez dolní by se na malém monitoru zdrobnila písmena
+k nečitelnosti, bez horní by overlay na velkém zabral půl obrazovky. Když by plné rozložení
+vyžadovalo zvětšení pod 0,85, sekce desek se při startu sbalí sama a zbytek se vejde
+v čitelnější velikosti.
+
+#### Původní pravidlo bez scrollu
 
 Výška se při každém vytvoření okna aktivně vypočítá:
 
@@ -777,6 +805,9 @@ Následuje karta s vlastní deskou a pod ní buď `NABÍDKA BOBA`, nebo `DESKA S
 toho, jestli právě běží souboj. Každý řádek ukazuje pozici, hvězdičku u zlaté karty,
 jméno, klíčová slova celým jménem (`Taunt`, `Divine Shield`, `Reborn`, `Venomous`,
 `Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako číslo s hvězdičkou.
+Statistiky nad tisíc se krátí přes `StatFormat.Compact` na `1k` nebo `2,4k`; v pozdních kolech
+mají čtyři místa a do sloupců ani na kartičku se nevejdou. Zaokrouhluje se vždy dolů, aby
+zkratka netvrdila víc, než minion doopravdy má.
 Sloupce drží stejnou šířku napříč řádky přes `SharedSizeGroup`; bez něj si každý řádek
 měří `Auto` sloupce sám a hodnoty se nezarovnají pod sebe.
 
@@ -787,7 +818,18 @@ slovy. Do kartičky se klíčová slova vejdou jen oříznutá, protože má pev
 Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku zmenší. Slouží
 to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
 
-Panel `POSLEDNÍ UDÁLOSTI` zobrazuje události od nejnovější po nejstarší. `TrackerState`
+Panel `POSLEDNÍ UDÁLOSTI` se drží toho, co se týká vlastního hrdiny, respektive vlastního týmu
+v Duos. Souboj hlásí kolo, soupeře, výsledek a poškození: `Kolo 12 · tým vs Vanndar Stormpike:
+výhra, dal jsem 34 dmg.` Dané poškození log nehlásí zvlášť, počítá se z přírůstku tagu `DAMAGE`
+na soupeřově hrdinovi za dobu souboje. Vyřazení jmenuje **hrdinu**, ne hráče: hrdina se pamatuje
+lépe a v Duos ho log zná i u hráčů, jejichž BattleTag nikdy neodhalí.
+
+Výsledek souboje se dozvídáme po částech — nejdřív jestli se vyhrálo, pak poškození jedné
+a druhé strany — a mezi tím se do panelu vejdou i jiné události. `TrackerState.UpdateEvent`
+proto přepisuje už zveřejněnou hlášku na jejím místě; přepis jen poslední položky nestačil,
+protože se mezi ni a doplněk vešlo vyřazení hráče.
+
+Panel zobrazuje události od nejnovější po nejstarší. `TrackerState`
 uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je na
 šest řádků navržený, takže se scrollbar objeví jen u delších zalomených textů.
 
@@ -898,6 +940,9 @@ s `INotifyPropertyChanged`. Pro každé Card ID existuje jediná instance, takž
 zůstane při porovnání stejný a doplnění dat nepřestaví celý seznam ani nezavře otevřené
 podokno. Obrázek se dekóduje na pozadí s `BitmapCacheOption.OnLoad` a zmrazí, aby šel předat
 do vlákna rozhraní.
+
+Portrét je v oválu vystřižený z prostředních 74 % kresby, o kousek výš, protože postava na kartě
+sedí v horní polovině. Bez toho koukaly v okrajích oválu světlé kraje čtvercové kresby.
 
 Obojí se vyžádá už při složení modelu pohledu, ne až při najetí myší. Než uživatel na řádek
 najede, jsou data zpravidla stažená. Když se stáhnout nepodaří, kartička se vykreslí na
@@ -1055,7 +1100,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje čtyřicet testů.
+Test suite aktuálně obsahuje padesát čtyři testů.
 
 Původní čtyři:
 
@@ -1111,7 +1156,10 @@ nikdy neobjeví na dvou řádcích tabulky zároveň.
 Dva v `MatchLogArchiveTests` pokrývají kompresi: zabalení dohraného zápasu se zachováním
 obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s ořezem retence.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 40 testů prošlo.
+Čtrnáct v `StatFormatTests` pokrývá zkrácený zápis statistik: hranice tisíce, desetinu jen do
+deseti tisíc, zaokrouhlování vždy dolů a zástupný znak u neznámé hodnoty.
+
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 54 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:

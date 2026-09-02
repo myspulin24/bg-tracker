@@ -325,25 +325,31 @@ public sealed class TrackerState
     }
 
     /// <summary>
-    /// Přepíše poslední událost místo přidání nové. V Duos přijde poškození ze souboje na dvakrát,
-    /// jak dobojuje každý ze spoluhráčů, a dvě hlášky o témže souboji pak panel jen zaplevelí.
+    /// Přepíše už zveřejněnou událost na jejím místě. Výsledek souboje se dozvídáme po částech:
+    /// nejdřív jestli se vyhrálo, potom poškození jedné a druhé strany. Bez přepisu by o jednom
+    /// souboji stálo v panelu několik protichůdných vět, a přepis jen poslední položky nestačí,
+    /// protože se mezi ně vejde třeba vyřazení hráče.
     /// </summary>
-    internal void ReplaceLastEvent(string message)
+    internal bool UpdateEvent(string oldMessage, string newMessage)
     {
-        if (recentEvents.Count == 0)
+        if (!recentEvents.Contains(oldMessage))
         {
-            AddEvent(message);
-            return;
+            return false;
         }
 
         var kept = recentEvents.ToArray();
         recentEvents.Clear();
-        for (var index = 0; index < kept.Length - 1; index++)
+        foreach (var message in kept)
         {
-            recentEvents.Enqueue(kept[index]);
+            recentEvents.Enqueue(message.Equals(oldMessage, StringComparison.Ordinal) ? newMessage : message);
         }
 
-        AddEvent(message);
+        if (string.Equals(LastEvent, oldMessage, StringComparison.Ordinal))
+        {
+            LastEvent = newMessage;
+        }
+
+        return true;
     }
 
     private IReadOnlyList<BoardMinion> Board(int? controllerId) => controllerId is not { } controller

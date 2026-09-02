@@ -20,11 +20,27 @@ public partial class MainWindow : Window
         Replay
     }
 
+    /// <summary>Šířka, na kterou je rozložení navržené. Obsah se sází v ní a Viewbox ho škáluje.</summary>
+    private const double DesignWidth = 500;
+
     /// <summary>Výška, na kterou je rozložení navržené, aby se žádný panel nemusel scrollovat.</summary>
     private const double ExpandedDesignHeight = 1163;
 
     /// <summary>Táž výška se sbalenou sekcí desek.</summary>
     private const double CollapsedDesignHeight = 879;
+
+    /// <summary>Jakou část výšky pracovní plochy má overlay zabrat.</summary>
+    private const double WorkAreaShare = 0.94;
+
+    /// <summary>
+    /// Mezní zvětšení. Bez dolní hranice by na malém monitoru zdrobněla písmena k nečitelnosti,
+    /// bez horní by na velkém overlay zabral půl obrazovky.
+    /// </summary>
+    private const double MinScale = 0.70;
+    private const double MaxScale = 1.30;
+
+    /// <summary>Pod tímhle zvětšením se sekce desek radši sbalí, než aby se drobnilo písmo.</summary>
+    private const double CollapseBelowScale = 0.85;
 
     /// <summary>Jak často se v živém režimu ověří, jestli hra nezaložila nový session log.</summary>
     private const int LiveDiscoveryIntervalTicks = 15;
@@ -49,9 +65,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        // Na monitoru, kam se plné rozložení nevejde, se desky sbalí rovnou. Jinak by uživatel
-        // přišel o spodek okna včetně ovládacích tlačítek.
-        SetBoardsVisible(SystemParameters.WorkArea.Height - 24 >= ExpandedDesignHeight);
+        // Na monitoru, kde by se plné rozložení muselo hodně zdrobnit, se desky sbalí rovnou.
+        // Zbytek se pak vejde v čitelnější velikosti.
+        SetBoardsVisible(ScaleFor(ExpandedDesignHeight) >= CollapseBelowScale);
         DataContext = viewModel;
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
@@ -75,20 +91,38 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Nastaví výšku okna podle toho, jestli je sekce desek rozbalená, a omezí ji pracovní
-    /// plochou. Návrhové výšky odpovídají obsahu, takže nezbývá prázdné místo ani se nic neořízne.
+    /// Přepočítá velikost okna. Rozložení se sází v návrhových jednotkách a <c>Viewbox</c> ho
+    /// zvětší nebo zmenší na okno, takže overlay zabere stejný podíl obrazovky na FullHD i na 4K
+    /// a nic se nemusí ořezávat ani scrollovat.
     /// </summary>
     private void UpdateWindowHeight()
     {
-        var wanted = BoardsContent.Visibility == Visibility.Visible
+        var design = BoardsContent.Visibility == Visibility.Visible
             ? ExpandedDesignHeight
             : CollapsedDesignHeight;
-        var available = SystemParameters.WorkArea.Height - 24;
-        expandedHeight = Math.Max(MinHeight, Math.Min(wanted, available));
+        RootCard.Height = design;
+
+        var scale = ScaleFor(design);
+        MinWidth = DesignWidth * MinScale;
+        MinHeight = CollapsedDesignHeight * MinScale;
+        expandedMinHeight = MinHeight;
+        expandedHeight = design * scale;
+        Width = DesignWidth * scale;
         if (!isCollapsed)
         {
             Height = expandedHeight;
         }
+    }
+
+    /// <summary>
+    /// Zvětšení pro danou návrhovou výšku. Bere se z výšky pracovní plochy, ne z počtu pixelů:
+    /// pracovní plocha už je v jednotkách nezávislých na DPI, takže se do výpočtu nezanese
+    /// zvětšení, které si Windows nastavují samy.
+    /// </summary>
+    private static double ScaleFor(double designHeight)
+    {
+        var available = SystemParameters.WorkArea.Height * WorkAreaShare;
+        return Math.Clamp(available / designHeight, MinScale, MaxScale);
     }
 
     /// <summary>
