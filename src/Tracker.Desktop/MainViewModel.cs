@@ -55,6 +55,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Herní režim lobby: <c>SÓLO</c>, nebo <c>DUOS</c>.</summary>
     public string GameMode { get => gameMode; private set => Set(ref gameMode, value); }
+
+    /// <summary>Verze v hlavičce, ať je na první pohled vidět, co běží.</summary>
+    public string Version => TrackerVersion.Display;
+
+    /// <summary>Ladicí build se v hlavičce odliší barvou.</summary>
+    public bool IsDevelopmentBuild => TrackerVersion.IsDevelopmentBuild;
+
     public string SourceDescription { get => sourceDescription; set => Set(ref sourceDescription, value); }
     public bool IsPauseEnabled { get => isPauseEnabled; set => Set(ref isPauseEnabled, value); }
 

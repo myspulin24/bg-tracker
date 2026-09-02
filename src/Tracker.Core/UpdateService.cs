@@ -78,7 +78,7 @@ public sealed class UpdateService(string repository = UpdateService.DefaultRepos
     {
         if (!release.TryGetProperty("tag_name", out var tag) ||
             !TryParseVersion(tag.GetString(), out var version) ||
-            !TryParseVersion(TrackerVersion.Current, out var current) ||
+            !TryParseVersion(TrackerVersion.Numeric, out var current) ||
             version <= current)
         {
             return null;
@@ -191,7 +191,7 @@ public sealed class UpdateService(string repository = UpdateService.DefaultRepos
         var created = handler is null ? new HttpClient() : new HttpClient(handler);
         created.Timeout = TimeSpan.FromMinutes(10);
         // GitHub API odmítá požadavky bez User-Agent.
-        created.DefaultRequestHeaders.UserAgent.ParseAdd($"BattlegroundsTracker/{TrackerVersion.Current}");
+        created.DefaultRequestHeaders.UserAgent.ParseAdd($"BattlegroundsTracker/{TrackerVersion.Numeric}");
         created.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         return created;
     }

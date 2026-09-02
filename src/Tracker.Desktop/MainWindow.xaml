@@ -268,10 +268,39 @@
                                 <TextBlock Text="BATTLEGROUNDS TRACKER" FontSize="14" FontWeight="Bold" />
                                 <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                     <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                    <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10" MaxWidth="330"
+                                    <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10" MaxWidth="300"
                                                TextTrimming="CharacterEllipsis" ToolTip="{Binding SourceTooltip}">
                                         <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding GameMode, Mode=OneWay}" FontWeight="Bold" Foreground="#E6A23C" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
                                     </TextBlock>
+                                    <!-- Verze hned za režimem. Ladicí build se odliší okrovou barvou
+                                         a rámečkem, aby se nedal splést s vydanou verzí. -->
+                                    <Border Margin="7,0,0,0" Padding="4,0,4,1" CornerRadius="3" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#16202E" />
+                                                <Setter Property="BorderBrush" Value="#2C3B52" />
+                                                <Setter Property="BorderThickness" Value="1" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDevelopmentBuild}" Value="True">
+                                                        <Setter Property="Background" Value="#3A2C10" />
+                                                        <Setter Property="BorderBrush" Value="#8A6A22" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding Version, Mode=OneWay}" FontSize="9" FontWeight="Bold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource SecondaryText}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsDevelopmentBuild}" Value="True">
+                                                            <Setter Property="Foreground" Value="#F4D06F" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>

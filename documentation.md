@@ -833,6 +833,11 @@ Panel zobrazuje události od nejnovější po nejstarší. `TrackerState`
 uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je na
 šest řádků navržený, takže se scrollbar objeví jen u delších zalomených textů.
 
+V hlavičce je za režimem čtení a herním režimem ještě verze. Ladicí build se pozná i barvou:
+okrový rámeček a okrové písmo místo tlumeného. Bez toho se dá snadno hodinu ladit něco, co
+vůbec neběží — přesně to se stalo, když vydaný Release zůstal o dva dny starší než opravený
+Debug.
+
 Dolní část obsahuje stav, výsledek, diagnostiku počtu zpracovaných řádků a rozpoznaných
 událostí a tlačítka:
 
@@ -1034,7 +1039,7 @@ Konzolové EXE se publikuje pomocí `scripts\publish.ps1` do
 
 ## 14. Verze a distribuce
 
-### 14.1 Kde se verze udržuje
+### 14.1 Kde se verze udržuje a jak se pozná ladicí build
 
 Číslo verze má jediný zdroj, `Version` v `Directory.Build.props`. Odtud ho MSBuild propíše
 do `AssemblyVersion`, `FileVersion` i `InformationalVersion`, takže stejná hodnota je ve
@@ -1048,6 +1053,14 @@ vracelo pod `dotnet test` verzi testhostu.
 
 Verze je vidět v patičce overlaye, v hlavičce konzolového dashboardu a přes
 `--version`.
+
+Verze se drží v `VersionPrefix` v `Directory.Build.props`. Ladicí build k ní dostane příponu
+přes `VersionSuffix`, takže hlásí `0.7.1-dev`, kdežto Release `0.7.1`. Vydává se jen Release, takže
+spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
+
+`TrackerVersion` proto nabízí tři věci: `Current` s příponou pro zobrazení, `Numeric` bez ní pro
+porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.7.1-dev` selhalo) a `IsDevelopmentBuild`
+pro odlišení v rozhraní.
 
 ### 14.2 Vydání nové verze
 

@@ -9,10 +9,16 @@
   <!-- Jediné místo, kde se verze a autorství udržují. Odsud je dědí AssemblyVersion,
        FileVersion i InformationalVersion, takže sedí v UI i ve vlastnostech souboru .exe. -->
   <PropertyGroup>
-    <Version>0.7.0</Version>
+    <VersionPrefix>0.7.1</VersionPrefix>
     <Product>Battlegrounds Tracker</Product>
     <Authors>Michal Jašek</Authors>
     <Company>Michal Jašek</Company>
     <Copyright>© 2026 Michal Jašek</Copyright>
+  </PropertyGroup>
+
+  <!-- Ladicí build se označí jako 0.7.1-dev. Vydává se jen Release, takže se nemůže stát,
+       že by se spuštěná binárka tvářila jako vydaná verze, kterou nikdo nevidel. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
 </Project>

@@ -8,10 +8,22 @@ namespace Tracker.Core;
 /// </summary>
 public static class TrackerVersion
 {
-    /// <summary>Verze ve tvaru <c>0.1.0</c>, bez případného build metadata za znakem <c>+</c>.</summary>
+    /// <summary>
+    /// Verze ve tvaru <c>0.1.0</c>, případně <c>0.1.0-dev</c> u ladicího buildu. Bez build
+    /// metadata za znakem <c>+</c>.
+    /// </summary>
     public static string Current { get; } = Read();
 
-    /// <summary>Verze pro zobrazení v UI, tedy <c>v0.1.0</c>.</summary>
+    /// <summary>
+    /// Číselná část verze bez přípony. Podle ní se porovnává s vydáními na GitHubu, protože
+    /// <c>Version.TryParse</c> by na <c>0.1.0-dev</c> selhalo.
+    /// </summary>
+    public static string Numeric { get; } = Current.Split('-')[0];
+
+    /// <summary>Ladicí build; vydává se jen Release, takže tohle nikdy není verze od uživatele.</summary>
+    public static bool IsDevelopmentBuild { get; } = Current.Contains('-', StringComparison.Ordinal);
+
+    /// <summary>Verze pro zobrazení v UI, tedy <c>v0.1.0</c> nebo <c>v0.1.0-dev</c>.</summary>
     public static string Display => $"v{Current}";
 
     /// <summary>Copyright ze stejného zdroje jako vlastnosti souboru <c>.exe</c>.</summary>
