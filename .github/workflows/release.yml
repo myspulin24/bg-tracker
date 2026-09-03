@@ -2,11 +2,12 @@ name: release
 
 # Vydání se spouští tagem, například `git tag v0.2.0 && git push origin v0.2.0`.
 # Číslo z tagu se propíše do sestavení, takže se verze v aplikaci nemůže rozejít s vydáním.
+# Tag, VersionPrefix v Directory.Build.props a sekce v CHANGELOG.md musí sedět, jinak
+# se nic nevypublikuje — kontroluje to scripts/verify-version.ps1.
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,20 +16,26 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
-      - name: Odvodit verzi z tagu
+      - name: Zkontrolovat verzi a vytáhnout popis vydání
         id: version
         shell: pwsh
         run: |
           $tag = '${{ github.ref_name }}'
-          $version = $tag -replace '^v', ''
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { $version = '0.0.0' }
+          .\scripts\verify-version.ps1 -Tag $tag -NotesOut release-notes.md
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $version = $tag.Substring(1)
+          # Kontrola už build metadata odmítla, takže pomlčka může znamenat jen předvydání.
+          # Předvydání se na GitHubu označí, aby ho `releases/latest` nenabízel uživatelům.
+          $prerelease = if ($version -match '-') { 'true' } else { 'false' }
           "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+          Write-Host "Vydání $version (předvydání: $prerelease)"
 
       - name: Sestavit a otestovat
         run: |
@@ -52,9 +59,10 @@ jobs:
           Write-Host "SHA256: $hash"
 
       - name: Vytvořit vydání
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
+          body_path: release-notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             publish/BattlegroundsTracker.exe
             publish/BattlegroundsTracker.exe.sha256
-          generate_release_notes: true

@@ -3,6 +3,10 @@
 Lokální overlay pro Hearthstone Battlegrounds. Čte pouze `Power.log`, nijak
 nezasahuje do procesu hry a neautomatizuje vstupy.
 
+Změny po verzích jsou v [CHANGELOG.md](CHANGELOG.md). Číslování se drží
+[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html); pravidla a postup vydání
+popisuje `documentation.md`, sekce 14.
+
 ## Instalace
 
 1. Stáhněte `BattlegroundsTracker.exe` z [posledního vydání](https://github.com/myspulin24/bg-tracker/releases/latest).

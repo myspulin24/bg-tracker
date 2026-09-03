@@ -62,6 +62,8 @@ projít bez varování.
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
 | `assets/bg-tracker.ico` | Ikona „BG“ pro `.exe` obou aplikací i pro okno overlaye v hlavním panelu. Obsahuje velikosti 16 až 256. |
 | `.github/workflows` | CI při každém pushi a vydání nové verze při tagu `v*`. |
+| `CHANGELOG.md` | Záznam změn podle Keep a Changelog; sekce vydané verze je zároveň popisem vydání na GitHubu. |
+| `scripts/verify-version.ps1` | Kontrola Semantic Versioning 2.0.0: tag, `VersionPrefix` a sekce v changelogu musí sedět. Umí vypsat popis vydání z changelogu. |
 | `scripts/publish-gui.ps1` | Self-contained single-file publikace WPF aplikace. |
 | `scripts/publish.ps1` | Self-contained single-file publikace konzolové aplikace. |
 | `artifacts` | Výstupy publikace; vznikají až při publish a nejsou součástí zdrojové architektury. |
@@ -1095,20 +1097,64 @@ spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
 porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.8.0-dev` selhalo) a `IsDevelopmentBuild`
 pro odlišení v rozhraní.
 
+#### Pravidla verzování
+
+Projekt se drží [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Hlavní
+číslo je nula, takže podle bodu 4 specifikace jde o počáteční vývoj a veřejné rozhraní se
+smí měnit i mezi vedlejšími verzemi. Číslo se zvyšuje takto:
+
+| Číslo | Kdy | Příklad z historie |
+| --- | --- | --- |
+| MAJOR | až s prvním stabilním rozhraním, tedy 1.0.0 | — |
+| MINOR | nová funkce nebo viditelná změna chování | 0.8.0 počítadlo bonusů |
+| PATCH | jen oprava, bez nové funkce | 0.2.1 místo pro šest řádků událostí |
+
+Přípona předvydání se lepí přes `VersionSuffix`, tedy `0.8.0-dev` u ladicího buildu nebo
+`0.9.0-rc.1` u tagu. Předvydání má podle specifikace nižší precedenci než tatáž verze bez
+přípony a workflow ho na GitHubu označí jako prerelease, takže ho `releases/latest`
+nenabídne uživatelům. Build metadata za znakem `+` doplňuje CI z commitu; do precedence se
+nepočítají a do tagu nepatří.
+
+Tři místa musí říkat totéž a hlídá to `scripts/verify-version.ps1`:
+
+1. `VersionPrefix` v `Directory.Build.props` — jen `MAJOR.MINOR.PATCH`, bez přípony;
+2. tag vydání — `v` a tatáž verze, volitelně s předvydáním;
+3. sekce v `CHANGELOG.md` — `## [verze] - RRRR-MM-DD`.
+
+Skript kontroluje i formát changelogu: první sekce musí být `[Nevydáno]`, verze musí být
+platné podle specifikace, mít datum, být unikátní a jít v sestupném pořadí podle precedence.
+Běží v CI při každém pushi a znovu před každým vydáním, takže rozpor se pozná při commitu,
+ne až po pushnutí tagu.
+
 ### 14.2 Vydání nové verze
 
-Vydání spouští tag:
+Vydání spouští tag. Postup je závazný a jeho první tři kroky vynucuje CI:
 
 ```powershell
-# 1. zvýšit Version v Directory.Build.props a commitnout
-git tag v0.2.0
-git push origin v0.2.0
+# 1. zvýšit VersionPrefix v Directory.Build.props podle pravidel v 14.1
+# 2. v CHANGELOG.md přepsat sekci [Nevydáno] na "## [0.9.0] - RRRR-MM-DD"
+#    a založit novou prázdnou [Nevydáno]; doplnit i odkaz na porovnání na konci souboru
+# 3. ověřit lokálně, ať se chyba nepozná až po pushnutí tagu
+.\scripts\verify-version.ps1 -Tag v0.9.0
+
+# 4. commitnout, pushnout main, otagovat a pushnout tag
+git tag v0.9.0
+git push origin v0.9.0
 ```
 
-Workflow `.github/workflows/release.yml` z tagu odvodí číslo verze, sestaví Release,
-spustí testy i `dotnet format`, vypublikuje jednosouborový `.exe` a připojí ho i s
-`.sha256` k vydání na GitHubu. Číslo v tagu se předává buildu přes `-p:Version=`, takže
+Workflow `.github/workflows/release.yml` nejdřív spustí tutéž kontrolu. Když tag,
+`VersionPrefix` a changelog nesedí, skončí to chybou **před** buildem a publikací, takže
+nevznikne poloviční vydání. Ze sekce changelogu se zároveň vytáhne popis vydání, který se
+na GitHub pošle jako `body_path` — vydání tedy nemůže existovat bez záznamu v changelogu.
+Neplatný tag je chyba; dřív se z něj potichu odvodila verze `0.0.0` a vydání se přesto
+vypublikovalo.
+
+Potom se sestaví Release, projdou testy i `dotnet format`, vypublikuje se jednosouborový
+`.exe` a připojí se i s `.sha256`. Číslo v tagu se předává buildu přes `-p:Version=`, takže
 se verze v aplikaci nemůže rozejít s číslem vydání.
+
+`release.yml` se schválně nedá spustit přes `workflow_dispatch`: mimo tag by `github.ref_name`
+nenesl verzi a vzniklo by vydání s nesmyslným číslem.
 
 `.github/workflows/ci.yml` dělá totéž bez publikace při každém pushi do `main`.
 
