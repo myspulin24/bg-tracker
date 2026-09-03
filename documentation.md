@@ -56,7 +56,7 @@ projít bez varování.
 
 | Projekt / cesta | Odpovědnost |
 | --- | --- |
-| `src/Tracker.Core` | Parser `Power.log`, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb a popisů karet. |
+| `src/Tracker.Core` | Parser `Power.log`, hledání instalace hry, geometrie okna, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb a popisů karet. |
 | `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly, ovládání okna a okno s patch notes ve vestavěném prohlížeči. |
 | `src/Tracker.App` | Původní konzolová varianta, replay a textový dashboard. |
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
@@ -117,23 +117,59 @@ Verbose=true
 Hearthstone je po změně vhodné ukončit a znovu spustit. Před úpravou existujícího
 `log.config` je vhodné vytvořit zálohu a zachovat ostatní sekce.
 
+### 5.1b Okno musí zůstat v dosahu
+
+Overlay se dá přetáhnout jen za hlavičku, takže když hlavička skončí mimo monitory, uživatel
+s oknem nemůže nic dělat. Stává se to po odpojení druhého monitoru, po změně rozlišení
+a hlavně při startu: `WindowStartupLocation="CenterScreen"` vystředí okno na monitor
+s kurzorem, ale velikost se počítá z `SystemParameters.WorkArea`, tedy z **hlavní** pracovní
+plochy. Na menším monitoru je pak okno vyšší než obrazovka a vystředění pošle horní okraj do
+minusu.
+
+Geometrii řeší `WindowPlacement.Clamp` v `Tracker.Core`, aby se dala testovat bez WPF: dostane
+obdélník okna a plochu všech monitorů a vrátí polohu, ve které je hlavička vidět. Vodorovně
+smí okno vyčnívat, ale musí z něj zbýt aspoň 120 bodů; svisle nesmí být nad horní hranou ani
+níž, než aby zbylo 64 bodů na hlavičku. Vodorovná poloha se jinak nemění, takže okno neuteče
+z monitoru, na kterém ho uživatel má.
+
+`EnsureOnScreen` v `MainWindow` se volá na třech místech: v `Loaded`, na konci
+`UpdateWindowHeight` a z `SystemEvents.DisplaySettingsChanged`. Poslední záchranou je položka
+menu **Vrátit okno na obrazovku**, která okno vystředí na hlavní monitor v návrhové velikosti.
+
 ### 5.2 Automatické hledání
 
-Desktop používá `PowerLogDiscovery`. Kontroluje zejména:
+Desktop používá `PowerLogDiscovery`. Instalace se hledají v tomto pořadí:
 
-- `%ProgramFiles(x86)%\Hearthstone\Logs`;
-- `%ProgramFiles%\Hearthstone\Logs`;
-- `%LOCALAPPDATA%\Blizzard\Hearthstone\Logs`;
-- `Hearthstone\Logs` a `Games\Hearthstone\Logs` na připravených pevných discích;
-- jak přímý `Power.log`, tak session adresáře `Hearthstone_*\Power.log`.
+- **cesta z registry**, hodnota `InstallLocation` v klíči
+  `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Hearthstone` a
+  `SOFTWARE\Blizzard Entertainment\Hearthstone`, ve 32bitovém i 64bitovém pohledu a v HKLM
+  i HKCU. Tohle je jediný způsob, jak najít hru ve složce, na kterou by se nedalo uhodnout —
+  instalátor Blizzardu nechá uživatele vybrat libovolnou cestu a lidé hru běžně stěhují na
+  druhý disk;
+- `%ProgramFiles(x86)%\Hearthstone`, `%ProgramFiles%\Hearthstone`
+  a `%LOCALAPPDATA%\Blizzard\Hearthstone`;
+- na **každém pevném disku** devět běžných umístění: `Hearthstone`, `Games\Hearthstone`,
+  `Program Files\Hearthstone`, `Program Files (x86)\Hearthstone`, `Battle.net\Hearthstone`,
+  `Blizzard\Hearthstone`, `Blizzard Entertainment\Hearthstone`,
+  `Games\Blizzard\Hearthstone` a `Games\Battle.net\Hearthstone`.
 
-Z existujících kandidátů zvolí naposledy změněný soubor. Přístupovou chybu nebo souběžnou
-rotaci adresáře bezpečně ignoruje. Ručně zadaná cesta má přednost.
+V každé instalaci se zkouší jak přímý `Logs\Power.log`, tak session adresáře
+`Logs\Hearthstone_*\Power.log`. Z existujících kandidátů se zvolí naposledy změněný soubor.
+Přístupovou chybu nebo souběžnou rotaci adresáře discovery bezpečně ignoruje a ručně zadaná
+cesta má přednost.
+
+Čtení registry je za `OperatingSystem.IsWindows()`, protože `Tracker.Core` cílí na `net8.0`
+a bez té podmínky by `TreatWarningsAsErrors` shodil build na CA1416. Hledání v kořenech je
+oddělené v `FindInRoots`, aby se dalo testovat nad dočasnými adresáři bez skutečné instalace.
 
 Hledá se výhradně jméno `Power.log`. Po ukončení hry Hearthstone soubor přejmenuje na
 `Power_old.log`, takže mimo běžící hru discovery záměrně nenajde nic. Starší session log
 lze prohlédnout přes **Vybrat log**, nebo bezpečněji konzolovým `--replay`, který nic
 nezapisuje.
+
+Když se log nenajde, tooltip u stavu vypíše, co se ověřilo: jestli běží hra, jestli má
+`log.config` sekci `[Power]` a ve kterých instalacích se našel adresář `Logs`. Bez toho
+vypadá chybějící logování, vypnutá hra i instalace mimo prohledávané cesty stejně.
 
 Desktop navíc považuje automaticky nalezený log za aktuální pouze tehdy, když běží
 proces `Hearthstone` a čas posledního zápisu logu není starší než přibližně jednu minutu
@@ -1125,11 +1161,11 @@ Verze je vidět v patičce overlaye, v hlavičce konzolového dashboardu a přes
 `--version`.
 
 Verze se drží v `VersionPrefix` v `Directory.Build.props`. Ladicí build k ní dostane příponu
-přes `VersionSuffix`, takže hlásí `0.9.0-dev`, kdežto Release `0.9.0`. Vydává se jen Release, takže
+přes `VersionSuffix`, takže hlásí `0.9.1-dev`, kdežto Release `0.9.1`. Vydává se jen Release, takže
 spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
 
 `TrackerVersion` proto nabízí tři věci: `Current` s příponou pro zobrazení, `Numeric` bez ní pro
-porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.9.0-dev` selhalo) a `IsDevelopmentBuild`
+porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.9.1-dev` selhalo) a `IsDevelopmentBuild`
 pro odlišení v rozhraní.
 
 #### Pravidla verzování

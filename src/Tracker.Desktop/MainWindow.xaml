@@ -475,7 +475,7 @@
                     <!-- Na nižším monitoru je tahle sekce první na sbalení; ušetří skoro 300 px. -->
                     <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="12,10">
                         <StackPanel>
-                            <Button Click="ToggleBoardsButton_Click" HorizontalContentAlignment="Stretch"
+                            <Button x:Name="ToggleBoardsButton" Click="ToggleBoardsButton_Click" HorizontalContentAlignment="Stretch"
                                     Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
                                     ToolTip="Skrýt nebo zobrazit desky">
                                 <Grid>
@@ -593,6 +593,8 @@
                                             <MenuItem Header="{Binding PauseButtonText}" Tag="&#xE769;"
                                                       IsEnabled="{Binding IsPauseEnabled}" Click="PauseButton_Click" />
                                             <Separator />
+                                            <MenuItem Header="Vrátit okno na obrazovku" Tag="&#xE923;"
+                                                      Click="ResetWindowButton_Click" />
                                             <MenuItem Header="Restart" Tag="&#xE72C;" Click="RestartButton_Click" />
                                         </ContextMenu>
                                     </Button.ContextMenu>

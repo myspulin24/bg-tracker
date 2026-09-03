@@ -75,6 +75,7 @@ public partial class MainWindow : Window
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
         timer.Tick += Timer_Tick;
         Loaded += MainWindow_Loaded;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
 
     private void ToggleBoardsButton_Click(object sender, RoutedEventArgs eventArgs) =>
@@ -114,7 +115,68 @@ public partial class MainWindow : Window
         {
             Height = expandedHeight;
         }
+
+        EnsureOnScreen();
     }
+
+    /// <summary>Plocha všech monitorů. Okno smí být na kterémkoli z nich, ale ne mimo ně.</summary>
+    private static WindowPlacement.Rect VirtualScreen => new(
+        SystemParameters.VirtualScreenLeft,
+        SystemParameters.VirtualScreenTop,
+        SystemParameters.VirtualScreenWidth,
+        SystemParameters.VirtualScreenHeight);
+
+    /// <summary>
+    /// Stáhne okno zpět, když jeho hlavička skončí mimo monitory. Overlay se dá přetáhnout jen
+    /// za hlavičku, takže bez tohohle zůstane okno nedosažitelné — stane se to po odpojení
+    /// druhého monitoru, po změně rozlišení nebo když je okno vyšší než obrazovka, na které
+    /// se otevřelo, protože vystředění pak pošle horní okraj do minusu.
+    /// </summary>
+    private void EnsureOnScreen()
+    {
+        if (WindowState != WindowState.Normal)
+        {
+            return;
+        }
+
+        var (left, top) = WindowPlacement.Clamp(Left, Top, Width, Height, VirtualScreen);
+        if (!double.IsNaN(left) && Math.Abs(left - Left) > 0.5)
+        {
+            Left = left;
+        }
+
+        if (!double.IsNaN(top) && Math.Abs(top - Top) > 0.5)
+        {
+            Top = top;
+        }
+    }
+
+    /// <summary>
+    /// Vrátí okno doprostřed hlavního monitoru v návrhové velikosti. Poslední záchrana, když
+    /// okno skončí mimo obrazovku nebo se ztratí na monitoru, který už není.
+    /// </summary>
+    private void ResetWindowButton_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        WindowState = WindowState.Normal;
+        UpdateWindowHeight();
+
+        var work = SystemParameters.WorkArea;
+        Left = work.Left + Math.Max(0, (work.Width - Width) / 2);
+        Top = work.Top + Math.Max(0, (work.Height - Height) / 2);
+        EnsureOnScreen();
+        Activate();
+    }
+
+    /// <summary>
+    /// Změna monitorů přijde na vlastním vlákně, takže se přepočet musí vrátit na vlákno
+    /// rozhraní. Odpojený monitor jinak nechá okno na souřadnicích, které už neexistují.
+    /// </summary>
+    private void OnDisplaySettingsChanged(object? sender, EventArgs eventArgs) =>
+        Dispatcher.BeginInvoke(() =>
+        {
+            UpdateWindowHeight();
+            EnsureOnScreen();
+        });
 
     /// <summary>
     /// Zvětšení pro danou návrhovou výšku. Bere se z výšky pracovní plochy, ne z počtu pixelů:
@@ -192,6 +254,11 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs eventArgs)
     {
+        // Teprve teď má okno skutečnou pozici. WindowStartupLocation="CenterScreen" ho vystředí
+        // na monitor s kurzorem, ale velikost se počítá z hlavní pracovní plochy, takže na menším
+        // monitoru může být okno vyšší než obrazovka a hlavička skončí nad její horní hranou.
+        EnsureOnScreen();
+
         ApplyPendingUpdate();
         _ = CheckForUpdateAsync();
 
@@ -536,10 +603,60 @@ public partial class MainWindow : Window
         viewModel.Update(tracker.State);
         viewModel.ModeLabel = "NASLOUCHÁM";
         viewModel.SourceDescription = "čekám na nový Power.log";
+        viewModel.SourceTooltip = ListeningDiagnosis();
         viewModel.PauseButtonText = "Pozastavit";
         viewModel.IsPauseEnabled = false;
         timer.Interval = TimeSpan.FromSeconds(1);
         timer.Start();
+    }
+
+    /// <summary>
+    /// Když se log nenajde, stav „čekám na nový Power.log“ vypadá stejně, ať chybí logování ve
+    /// hře, hra neběží, nebo je nainstalovaná mimo prohledávané cesty. Tooltip proto vypíše,
+    /// co se ověřilo a kde se hledalo, aby to uživatel poznal bez ptaní.
+    /// </summary>
+    private static string ListeningDiagnosis()
+    {
+        var lines = new List<string> { "Power.log aktuální relace hry jsem nenašel." };
+
+        try
+        {
+            lines.Add(Process.GetProcessesByName("Hearthstone").Length > 0
+                ? "• Hearthstone běží."
+                : "• Hearthstone neběží. Tracker se připojí, až ho spustíte.");
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            lines.Add("• Jestli Hearthstone běží, se nedá zjistit. Běží hra jako správce?");
+        }
+
+        var config = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Blizzard", "Hearthstone", "log.config");
+        try
+        {
+            lines.Add(File.Exists(config) &&
+                      File.ReadAllText(config).Contains("[Power]", StringComparison.OrdinalIgnoreCase)
+                ? "• log.config má sekci [Power]."
+                : $"• V {config} chybí sekce [Power]. Bez ní hra Power.log vůbec nepíše; po doplnění restartujte hru.");
+        }
+        catch (IOException)
+        {
+            lines.Add($"• {config} se nepodařilo přečíst.");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            lines.Add($"• K {config} nejsou práva.");
+        }
+
+        var roots = PowerLogDiscovery.InstallRoots();
+        var withLogs = roots.Where(root => Directory.Exists(Path.Combine(root, "Logs"))).ToArray();
+        lines.Add(withLogs.Length > 0
+            ? "• Adresář Logs jsem našel v: " + string.Join(", ", withLogs)
+            : $"• Ani v jedné z {roots.Count} prohledaných instalací není adresář Logs.");
+
+        lines.Add("• Vlastní cestu k logu lze vybrat v menu tlačítkem Vybrat log.");
+        return string.Join(Environment.NewLine, lines);
     }
 
     private bool HandleLine(string line) => tracker.Apply(parser.Parse(line));
@@ -569,6 +686,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs eventArgs)
     {
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         timer.Stop();
         updates.Cancel();
         matchArchive?.Dispose();

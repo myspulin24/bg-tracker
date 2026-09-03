@@ -10,6 +10,32 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.9.1] - 2026-09-03
+
+### Opraveno
+
+- Okno se nedalo vrátit, když jeho hlavička skončila mimo monitory. Overlay se dá přetáhnout
+  jen za hlavičku, takže po odpojení druhého monitoru, po změně rozlišení nebo když se okno
+  otevřelo na menší obrazovce, než na jakou je spočítané, zůstalo nedosažitelné. Hlavička se
+  teď automaticky stahuje na plochu monitorů, a to při startu, při každém přepočtu velikosti
+  i po změně monitorů. Vodorovná poloha se zachová, takže okno neuteče z monitoru, na kterém
+  ho uživatel má.
+- Hra nainstalovaná mimo výchozí složku se nenašla. Cesta k instalaci se teď čte z registry
+  (`InstallLocation` v odinstalačním klíči), takže se najde i na jiném disku a ve vlastní
+  složce. Kromě toho se na každém pevném disku zkouší devět běžných umístění místo dvou:
+  `Hearthstone`, `Games\Hearthstone`, `Program Files\Hearthstone`,
+  `Program Files (x86)\Hearthstone`, `Battle.net\Hearthstone`, `Blizzard\Hearthstone`,
+  `Blizzard Entertainment\Hearthstone`, `Games\Blizzard\Hearthstone`
+  a `Games\Battle.net\Hearthstone`.
+
+### Přidáno
+
+- Položka menu **Vrátit okno na obrazovku** vystředí overlay na hlavní monitor v návrhové
+  velikosti. Poslední záchrana, když okno skončí mimo obrazovku.
+- Když se log nenajde, tooltip u stavu vypíše proč: jestli hra běží, jestli má `log.config`
+  sekci `[Power]` a ve kterých instalacích se hledal adresář `Logs`. Dosud vypadaly všechny
+  tyhle případy stejně jako „čekám na nový Power.log“.
+
 ## [0.9.0] - 2026-09-03
 
 ### Přidáno
@@ -188,7 +214,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.0...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/myspulin24/bg-tracker/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/myspulin24/bg-tracker/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/myspulin24/bg-tracker/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/myspulin24/bg-tracker/compare/v0.7.1...v0.8.0
