@@ -10,6 +10,12 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.8.1] - 2026-09-03
+
+Chování aplikace se nemění: od 0.8.0 se v `src/` nezměnil ani jeden řádek a binárka je
+funkčně totožná. Mění se způsob vydávání a tohle je první vydání, které novým postupem
+projde celé.
+
 ### Přidáno
 
 - Tento changelog. Sekce vydané verze slouží zároveň jako popis vydání na GitHubu,
@@ -166,7 +172,8 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.8.0...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/myspulin24/bg-tracker/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/myspulin24/bg-tracker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/myspulin24/bg-tracker/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/myspulin24/bg-tracker/compare/v0.6.1...v0.7.0

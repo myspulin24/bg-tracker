@@ -1090,11 +1090,11 @@ Verze je vidět v patičce overlaye, v hlavičce konzolového dashboardu a přes
 `--version`.
 
 Verze se drží v `VersionPrefix` v `Directory.Build.props`. Ladicí build k ní dostane příponu
-přes `VersionSuffix`, takže hlásí `0.8.0-dev`, kdežto Release `0.8.0`. Vydává se jen Release, takže
+přes `VersionSuffix`, takže hlásí `0.8.1-dev`, kdežto Release `0.8.1`. Vydává se jen Release, takže
 spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
 
 `TrackerVersion` proto nabízí tři věci: `Current` s příponou pro zobrazení, `Numeric` bez ní pro
-porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.8.0-dev` selhalo) a `IsDevelopmentBuild`
+porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.8.1-dev` selhalo) a `IsDevelopmentBuild`
 pro odlišení v rozhraní.
 
 #### Pravidla verzování
