@@ -251,7 +251,10 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Background="#FA101825" CornerRadius="11,11,0,0" BorderBrush="#26344A" BorderThickness="0,0,0,1">
+                <!-- Hlavička. Ve sbaleném overlayi zůstane jako jediná vidět, a proto se jí
+                     v kódu dorovnává zakulacení: sbalená je celá karta, ne jen její horní okraj. -->
+                <Border x:Name="HeaderCard" Grid.Row="0" Background="#FA101825" CornerRadius="11,11,0,0"
+                        BorderBrush="#26344A" BorderThickness="0,0,0,1">
                     <Grid Margin="16,0,10,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

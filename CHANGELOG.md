@@ -10,6 +10,18 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.9.2] - 2026-09-03
+
+### Opraveno
+
+- Sbalení overlaye zdrobnilo celé okno, místo aby nechalo vrchní lištu. Od zavedení
+  `Viewboxu` v 0.7.0 škáluje jedno zvětšení celou kartu, takže samo skrytí obsahu nestačilo:
+  karta si držela plnou návrhovou výšku a okno snížené na 64 bodů z ní udělalo asi 27 bodů
+  širokou miniaturu. Sbalený overlay teď návrhovou výšku snižuje na hlavičku, drží šířku
+  rozbaleného okna a hlavička zůstává v původní velikosti.
+- Změna monitorů ve sbaleném stavu okno nafoukla na minimální výšku rozbaleného rozložení
+  (615 bodů) s prázdným obsahem, protože přepočet nastavoval `MinHeight`, ale výšku už ne.
+
 ## [0.9.1] - 2026-09-03
 
 ### Opraveno
@@ -214,7 +226,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.1...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/myspulin24/bg-tracker/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/myspulin24/bg-tracker/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/myspulin24/bg-tracker/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/myspulin24/bg-tracker/compare/v0.8.0...v0.8.1

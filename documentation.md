@@ -768,8 +768,16 @@ Vhodné budoucí rozšíření je:
 Overlay je bezrámové WPF okno s průhledným okolím, vlastním tmavým designem a
 `Topmost=true`. Ikona okna i `.exe` je `assets/bg-tracker.ico`; v hlavičce overlaye je
 stejná značka „BG“ vykreslená přímo v XAML. Má vlastní tlačítko zavření, sbalení a resize grip. Okno lze táhnout za
-horní lištu. Dvojklik na horní lištu nebo tlačítko `−` jej sbalí na výšku 64; při
-rozbalení se vrátí předchozí výška a možnost resize.
+horní lištu.
+
+Dvojklik na horní lištu nebo tlačítko `−` overlay sbalí na pruh hlavičky: obsah se skryje,
+okno si nechá šířku a zmenší se na výšku hlavičky, resize se vypne a hlavička se zakulatí
+i dole, protože je pak celou kartou. Rozbalení vrátí předchozí velikost i možnost resize.
+
+Sbalení musí kromě skrytí obsahu snížit i **návrhovou** výšku karty na 64 bodů. `Viewbox`
+škáluje celou kartu, takže dokud má karta plnou návrhovou výšku, udělá z ní nízké okno jen
+zdrobnělou miniaturu místo hlavičky v původní velikosti. Se stejnou výškou musí spadnout
+i `MinHeight` okna, který by ho na výšku hlavičky vůbec nepustil.
 
 Běžné topmost WPF okno funguje spolehlivě nad windowed nebo borderless fullscreenem.
 Nad exkluzivním fullscreen režimem Windows nemusí overlay zobrazit. To je omezení typu
@@ -829,7 +837,8 @@ zápasu nebo s nabídkou aktualizace, přebytek se nemá kam vejít a mřížka 
 řádek — tedy tlačítka. Události mají scrollbar, a tak jsou jediný panel, který se smí
 zmenšit; s `MinHeight="159"` se lišta při načítání vybraného logu rozbíjela.
 
-Rozložení má dvě návrhové výšky: 1163 bodů s rozbalenými deskami a 879 se sbalenými.
+Rozložení má tři návrhové výšky: 1163 bodů s rozbalenými deskami, 879 se sbalenými
+a 64 pro sbalený overlay, tedy samotný pruh hlavičky (viz 11.1).
 Ta první se nevejde na monitor s rozlišením 1920×1080, kde po odečtení hlavního panelu
 zbývá kolem 1010 bodů. Proto jde sekce s deskami sbalit klikem na její nadpis.
 **Když je při startu k dispozici méně místa, než potřebuje plné rozložení, sekce se sbalí

@@ -31,6 +31,11 @@ public partial class MainWindow : Window
     /// <summary>Táž výška se sbalenou sekcí desek.</summary>
     private const double CollapsedDesignHeight = 879;
 
+    /// <summary>
+    /// Návrhová výška hlavičky, tedy řádku 0 v rozložení. Sbalený overlay je jen tenhle pruh.
+    /// </summary>
+    private const double HeaderDesignHeight = 64;
+
     /// <summary>Jakou část výšky pracovní plochy má overlay zabrat.</summary>
     private const double WorkAreaShare = 0.94;
 
@@ -54,6 +59,7 @@ public partial class MainWindow : Window
     private PowerLogTailReader? liveReader;
     private MatchLogArchive? matchArchive;
     private int demoIndex;
+    private double expandedWidth = DesignWidth;
     private double expandedHeight = ExpandedDesignHeight;
     private double expandedMinHeight = 640;
     private bool isCollapsed;
@@ -100,23 +106,58 @@ public partial class MainWindow : Window
     /// </summary>
     private void UpdateWindowHeight()
     {
-        var design = BoardsContent.Visibility == Visibility.Visible
-            ? ExpandedDesignHeight
-            : CollapsedDesignHeight;
-        RootCard.Height = design;
-
+        var design = DesignHeight;
         var scale = ScaleFor(design);
         MinWidth = DesignWidth * MinScale;
-        MinHeight = CollapsedDesignHeight * MinScale;
-        expandedMinHeight = MinHeight;
+        expandedMinHeight = CollapsedDesignHeight * MinScale;
+        expandedWidth = DesignWidth * scale;
         expandedHeight = design * scale;
-        Width = DesignWidth * scale;
-        if (!isCollapsed)
+
+        if (isCollapsed)
         {
-            Height = expandedHeight;
+            ApplyCollapsedSize(expandedWidth);
+        }
+        else
+        {
+            ApplyExpandedSize();
         }
 
         EnsureOnScreen();
+    }
+
+    /// <summary>Návrhová výška podle toho, jestli je vidět sekce desek.</summary>
+    private double DesignHeight => BoardsContent.Visibility == Visibility.Visible
+        ? ExpandedDesignHeight
+        : CollapsedDesignHeight;
+
+    /// <summary>
+    /// Nasadí velikost rozbaleného okna: karta dostane návrhovou výšku a okno takovou, aby ji
+    /// <c>Viewbox</c> vyplnil beze zbytku.
+    /// </summary>
+    private void ApplyExpandedSize()
+    {
+        RootCard.Height = DesignHeight;
+        MinHeight = expandedMinHeight;
+        Width = expandedWidth;
+        Height = expandedHeight;
+    }
+
+    /// <summary>
+    /// Nasadí velikost sbaleného okna, tedy pruh hlavičky. Nestačí schovat obsah: <c>Viewbox</c>
+    /// škáluje celou kartu, takže dokud má karta plnou návrhovou výšku, udělá nízké okno z celé
+    /// karty jen zdrobnělou miniaturu místo hlavičky v původní velikosti. Návrhová výška proto
+    /// musí spadnout na hlavičku, a s ní i <see cref="FrameworkElement.MinHeight" />, který by
+    /// okno na tuhle výšku vůbec nepustil.
+    /// </summary>
+    private void ApplyCollapsedSize(double width)
+    {
+        RootCard.Height = HeaderDesignHeight;
+
+        // Poměr stran drží hlavičku ve stejném zvětšení, jaké mělo rozbalené okno.
+        var height = width * HeaderDesignHeight / DesignWidth;
+        MinHeight = height;
+        Width = width;
+        Height = height;
     }
 
     /// <summary>Plocha všech monitorů. Okno smí být na kterémkoli z nich, ale ne mimo ně.</summary>
@@ -731,30 +772,42 @@ public partial class MainWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs eventArgs) => Close();
 
+    /// <summary>
+    /// Sbalí overlay na pruh hlavičky, nebo ho vrátí do plné velikosti. Hlavička musí zůstat
+    /// vidět v původní velikosti: je to jediné místo, kterým se okno chytá a přetahuje, a taky
+    /// jediná cesta zpátky.
+    /// </summary>
     private void ToggleCollapsed()
     {
-        if (isCollapsed)
+        if (!isCollapsed)
         {
-            ContentPanel.Visibility = Visibility.Visible;
-            MinHeight = expandedMinHeight;
-            Height = expandedHeight;
-            ResizeMode = ResizeMode.CanResizeWithGrip;
-            CollapseButton.Content = "−";
-            CollapseButton.ToolTip = "Sbalit overlay";
-        }
-        else
-        {
+            // Ruční změna velikosti se má po rozbalení vrátit tam, kde byla.
+            expandedWidth = ActualWidth;
             expandedHeight = ActualHeight;
             expandedMinHeight = MinHeight;
-            ContentPanel.Visibility = Visibility.Collapsed;
-            MinHeight = 64;
-            Height = 64;
-            ResizeMode = ResizeMode.NoResize;
-            CollapseButton.Content = "□";
-            CollapseButton.ToolTip = "Rozbalit overlay";
         }
 
         isCollapsed = !isCollapsed;
+        ContentPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        ResizeMode = isCollapsed ? ResizeMode.NoResize : ResizeMode.CanResizeWithGrip;
+        CollapseButton.Content = isCollapsed ? "□" : "−";
+        CollapseButton.ToolTip = isCollapsed ? "Rozbalit overlay" : "Sbalit overlay";
+
+        // Sbalená hlavička je celá karta, takže se zakulatí i dole.
+        HeaderCard.CornerRadius = isCollapsed
+            ? new CornerRadius(11)
+            : new CornerRadius(11, 11, 0, 0);
+
+        if (isCollapsed)
+        {
+            ApplyCollapsedSize(expandedWidth);
+        }
+        else
+        {
+            ApplyExpandedSize();
+        }
+
+        EnsureOnScreen();
     }
 
     private static string? ParseLogArgument(string[] arguments)
