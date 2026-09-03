@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Text.RegularExpressions;
 using System.Windows.Threading;
@@ -314,6 +316,31 @@ public partial class MainWindow : Window
     }
 
     private void DemoButton_Click(object sender, RoutedEventArgs eventArgs) => StartDemo();
+
+    private void PatchNotesButton_Click(object sender, RoutedEventArgs eventArgs) => PatchNotesWindow.Show(this);
+
+    /// <summary>
+    /// Ovládání trackeru se schovává do menu, aby spodní lišta nezabírala celý řádek.
+    /// Menu se otevírá levým kliknutím a nad tlačítkem, protože lišta sedí u dolní hrany.
+    /// </summary>
+    private void ActionsButton_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Button { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            // Tlačítko sedí u pravého dolního rohu okna. Výchozí umístění by menu poslalo
+            // doprava mimo okno, protože na širší ploše ho WPF nemá kam odrazit, takže se
+            // menu zarovná pravou hranou k tlačítku a vyskočí nad něj.
+            menu.Placement = PlacementMode.Custom;
+            menu.CustomPopupPlacementCallback = (popupSize, targetSize, offset) =>
+            [
+                new CustomPopupPlacement(
+                    new Point(targetSize.Width - popupSize.Width, -popupSize.Height - 6),
+                    PopupPrimaryAxis.Horizontal)
+            ];
+            menu.IsOpen = true;
+        }
+    }
 
     private async void SelectLogButton_Click(object sender, RoutedEventArgs eventArgs)
     {

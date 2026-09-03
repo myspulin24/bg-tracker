@@ -57,7 +57,7 @@ projít bez varování.
 | Projekt / cesta | Odpovědnost |
 | --- | --- |
 | `src/Tracker.Core` | Parser `Power.log`, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb a popisů karet. |
-| `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly a ovládání okna. |
+| `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly, ovládání okna a okno s patch notes ve vestavěném prohlížeči. |
 | `src/Tracker.App` | Původní konzolová varianta, replay a textový dashboard. |
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
 | `assets/bg-tracker.ico` | Ikona „BG“ pro `.exe` obou aplikací i pro okno overlaye v hlavním panelu. Obsahuje velikosti 16 až 256. |
@@ -873,13 +873,48 @@ Ladicí build se pozná i barvou: okrový rámeček a okrové písmo místo tlum
 vůbec neběží — přesně to se stalo, když vydaný Release zůstal o dva dny starší než opravený
 Debug.
 
-Dolní část obsahuje stav, výsledek, diagnostiku počtu zpracovaných řádků a rozpoznaných
-událostí a tlačítka:
+Dolní část obsahuje stav, výsledek a diagnostiku počtu zpracovaných řádků a rozpoznaných
+událostí. Vpravo na témže řádku jsou dvě ikony: patch notes a ovládání. Ovládání se
+otevírá jako menu s položkami:
 
-- **Vybrat log** – standardní file dialog;
+- **Vybrat log…** – standardní file dialog;
 - **Spustit demo** – reset a syntetická data;
 - **Pozastavit / Pokračovat** – zastaví nebo spustí timer;
 - **Restart** – restartuje aktuální režim.
+
+Původně to byla čtyři tlačítka na samostatném řádku, který v pevné výšce karty zabíral
+skoro 40 px. Menu se umisťuje přes `CustomPopupPlacementCallback` pravou hranou k tlačítku
+a nad něj: tlačítko sedí u pravého dolního rohu okna, takže výchozí umístění by menu
+poslalo mimo okno a WPF ho na širší ploše nemá kam odrazit.
+
+Ikony jsou glyfy z fontu `Segoe MDL2 Assets`, ale **nesmí být pouhým `Content` tlačítka**.
+`ContentPresenter` z textového obsahu vyrobí `TextBlock`, na který se vztahuje implicitní
+styl `TextBlock` z `App.xaml`, a ten nastavuje `FontFamily="Segoe UI"`. Setter ze stylu
+přebije font zděděný z tlačítka, takže by se z glyfu stal prázdný rámeček. Proto je uvnitř
+tlačítka vlastní `TextBlock` se stylem `GlyphStyle`.
+
+#### Okno s patch notes
+
+Ikona patch notes otevře `PatchNotesWindow` s vestavěným prohlížečem `WebView2`. Okno je
+`Topmost` jako overlay, takže drží nad hrou, a má vlastní chrome ve stylu aplikace.
+
+Chování okna zajišťuje `WindowChrome`, ne `WindowStyle="None"` s `AllowsTransparency`.
+Druhá varianta nechá jen úchop v pravém dolním rohu a tažením se okno nezvětší vůbec;
+`WindowChrome` dá změnu velikosti ze všech stran, přichytávání k okrajům i tažení za
+titulní lištu. Dvě věci to vyžaduje:
+
+- tlačítka v oblasti titulku potřebují `WindowChrome.IsHitTestVisibleInChrome="True"`,
+  jinak kliknutí spolkne caption;
+- **`WebView2` nesmí sahat až k hraně okna.** Je to skutečné dceřiné okno (HWND), takže
+  by spolklo hit-test okrajů a okno by se tažením nedalo zvětšit. Proto má obal okraj
+  6 px, tedy stejný jako `ResizeBorderThickness`.
+
+Runtime WebView2 aplikace nevyžaduje. Na Windows 11 a všude s Edge je předinstalovaný;
+když chybí, `PatchNotesWindow.Show` okno vůbec neotevře a odkaz pošle do systémového
+prohlížeče. Totéž tlačítko je i v okně samotném a v chybovém hlášení, kdyby se prohlížeč
+nepodařilo nastartovat. Data prohlížeče jdou do
+`%LOCALAPPDATA%\BattlegroundsTracker\webview2`, protože výchozí složka leží vedle `.exe`,
+kam nemusí být právo zápisu.
 
 ### 11.4 Aktualizace kolekcí
 
@@ -1090,11 +1125,11 @@ Verze je vidět v patičce overlaye, v hlavičce konzolového dashboardu a přes
 `--version`.
 
 Verze se drží v `VersionPrefix` v `Directory.Build.props`. Ladicí build k ní dostane příponu
-přes `VersionSuffix`, takže hlásí `0.8.1-dev`, kdežto Release `0.8.1`. Vydává se jen Release, takže
+přes `VersionSuffix`, takže hlásí `0.9.0-dev`, kdežto Release `0.9.0`. Vydává se jen Release, takže
 spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
 
 `TrackerVersion` proto nabízí tři věci: `Current` s příponou pro zobrazení, `Numeric` bez ní pro
-porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.8.1-dev` selhalo) a `IsDevelopmentBuild`
+porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.9.0-dev` selhalo) a `IsDevelopmentBuild`
 pro odlišení v rozhraní.
 
 #### Pravidla verzování

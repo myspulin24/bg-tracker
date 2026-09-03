@@ -537,7 +537,6 @@
                     <Grid Grid.Row="8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                            <RowDefinition Height="7" /><RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0">
                             <Border Background="#1E2E1F" BorderBrush="#3C6B40" BorderThickness="1" CornerRadius="6"
@@ -565,18 +564,41 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                            <TextBlock FontSize="11">
-                                <Run Text="{Binding GameStatus, Mode=OneWay}" /><Run Text=" • výsledek: " /><Run Text="{Binding Result, Mode=OneWay}" />
-                            </TextBlock>
-                            <TextBlock Text="{Binding Diagnostics}" Foreground="{StaticResource SecondaryText}" FontSize="10" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Vybrat log" Click="SelectLogButton_Click" Margin="0,0,7,0" Padding="10,6" FontSize="11" />
-                            <Button Content="Spustit demo" Click="DemoButton_Click" Margin="0,0,7,0" Padding="10,6" FontSize="11" />
-                            <Button Content="{Binding PauseButtonText}" IsEnabled="{Binding IsPauseEnabled}" Click="PauseButton_Click" MinWidth="84" Padding="10,6" FontSize="11" />
-                            <Button Content="Restart" Click="RestartButton_Click" Margin="7,0,0,0" Padding="10,6" FontSize="11" />
-                        </StackPanel>
+                        <!-- Stav a diagnostika vlevo, ovládání vpravo jako dvě ikony. Samostatný
+                             řádek s tlačítky zabíral v pevné výšce karty skoro 40 px. -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock FontSize="11">
+                                    <Run Text="{Binding GameStatus, Mode=OneWay}" /><Run Text=" • výsledek: " /><Run Text="{Binding Result, Mode=OneWay}" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding Diagnostics}" Foreground="{StaticResource SecondaryText}" FontSize="10" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <Button Style="{StaticResource IconButtonStyle}"
+                                        Click="PatchNotesButton_Click" Margin="0,0,7,0"
+                                        ToolTip="Patch notes Hearthstone ve vestavěném prohlížeči">
+                                    <TextBlock Text="&#xE8A5;" Style="{StaticResource GlyphStyle}" FontSize="14" />
+                                </Button>
+                                <Button x:Name="ActionsButton" Style="{StaticResource IconButtonStyle}"
+                                        Click="ActionsButton_Click"
+                                        ToolTip="Ovládání trackeru">
+                                    <TextBlock Text="&#xE712;" Style="{StaticResource GlyphStyle}" FontSize="14" />
+                                    <Button.ContextMenu>
+                                        <ContextMenu x:Name="ActionsMenu">
+                                            <MenuItem Header="Vybrat log…" Tag="&#xE8E5;" Click="SelectLogButton_Click" />
+                                            <MenuItem Header="Spustit demo" Tag="&#xE768;" Click="DemoButton_Click" />
+                                            <MenuItem Header="{Binding PauseButtonText}" Tag="&#xE769;"
+                                                      IsEnabled="{Binding IsPauseEnabled}" Click="PauseButton_Click" />
+                                            <Separator />
+                                            <MenuItem Header="Restart" Tag="&#xE72C;" Click="RestartButton_Click" />
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Grid>

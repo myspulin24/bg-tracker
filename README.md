@@ -76,6 +76,7 @@ Pilot umí:
   se statistikami, tierem, zlatou verzí a klíčovými slovy;
 - po najetí myší na hráče ukázat jeho poslední známou desku i s číslem kola;
 - vypsat typy minionů, které se v lobby objevily v nabídce Boba;
+- otevřít patch notes Hearthstonu ve vestavěném prohlížeči, v okně nad hrou;
 - držet počítadlo bonusů platných pro celou hru: o kolik víc dávají tavern kouzla
   a blood gemy a jaký plošný buff mají elementálové a piráti;
 - sledovat zlato, cenu upgradu tavernu, dalšího soupeře a historii soubojů;
@@ -89,7 +90,10 @@ měnit a pilot záměrně netvrdí, že pozorovaná entita je vždy lokální hr
 
 - Windows;
 - .NET 8 SDK nebo novější pro vývojové spuštění;
-- Visual Studio 2022 s workloadem **.NET desktop development** je volitelné.
+- Visual Studio 2022 s workloadem **.NET desktop development** je volitelné;
+- runtime WebView2 jen pro okno s patch notes. Na Windows 11 a všude s Edge je
+  předinstalovaný; když chybí, odkaz se otevře v systémovém prohlížeči a nic jiného se
+  nemění.
 
 ## První spuštění
 

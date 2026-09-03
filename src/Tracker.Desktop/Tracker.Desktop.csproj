@@ -10,6 +10,12 @@
     <ProjectReference Include="..\Tracker.Core\Tracker.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Vestavěný prohlížeč pro okno s patch notes. Runtime WebView2 je na Windows 11
+         i všude s Edge předinstalovaný; když chybí, okno se neotevře a odkaz jde do
+         systémového prohlížeče, takže aplikace na něm není závislá. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Stejný soubor slouží jako ikona .exe i jako ikona okna v hlavním panelu. -->
     <Resource Include="..\..\assets\bg-tracker.ico" Link="Assets\bg-tracker.ico" />
   </ItemGroup>

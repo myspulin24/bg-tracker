@@ -10,6 +10,22 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.9.0] - 2026-09-03
+
+### Přidáno
+
+- Ikona patch notes ve spodní liště otevře okno s patch notes Hearthstonu ve vestavěném
+  prohlížeči. Okno se drží nad hrou, jde přesunout, zvětšit tažením za kteroukoli hranu,
+  maximalizovat i zavřít, a má tlačítka zpět, znovu načíst a otevřít v systémovém
+  prohlížeči. Když na stroji chybí runtime WebView2, odkaz jde rovnou do systémového
+  prohlížeče, takže aplikace na runtimu není závislá.
+
+### Změněno
+
+- Čtyři tlačítka ve spodní liště (vybrat log, spustit demo, pozastavit, restart) se
+  schovala do rozklikávacího menu. Samostatný řádek s tlačítky zabíral v pevné výšce karty
+  skoro 40 px.
+
 ## [0.8.1] - 2026-09-03
 
 Chování aplikace se nemění: od 0.8.0 se v `src/` nezměnil ani jeden řádek a binárka je
@@ -172,7 +188,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.8.1...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/myspulin24/bg-tracker/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/myspulin24/bg-tracker/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/myspulin24/bg-tracker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/myspulin24/bg-tracker/compare/v0.7.0...v0.7.1
