@@ -379,7 +379,8 @@ public sealed partial class GameStateTracker
             return false;
         }
 
-        switch (tag.ToUpperInvariant())
+        var upper = tag.ToUpperInvariant();
+        switch (upper)
         {
             case "RESOURCES":
                 State.Gold = numeric;
@@ -419,7 +420,51 @@ public sealed partial class GameStateTracker
             case "DAMAGE_DEALT_TO_HERO_LAST_TURN":
                 return RecordCombatDamage(numeric);
             default:
+                return ApplyGlobalBuffTag(upper, numeric);
+        }
+    }
+
+    /// <summary>
+    /// Bonusy platné pro celou hru, které hra drží na entitě hráče: tavern kouzla, blood gemy
+    /// a plošné buffy na elementály a piráty. Hodnota je kumulativní součet, takže se jen zrcadlí.
+    /// </summary>
+    private bool ApplyGlobalBuffTag(string tag, int numeric)
+    {
+        var buffs = State.Buffs;
+        switch (tag)
+        {
+            case "TAVERN_SPELL_ATTACK_INCREASE":
+                return Set(buffs.SpellAttack, numeric, value => buffs.SpellAttack = value);
+            case "TAVERN_SPELL_HEALTH_INCREASE":
+                return Set(buffs.SpellHealth, numeric, value => buffs.SpellHealth = value);
+            case "BACON_BLOODGEMBUFFATKVALUE":
+                return Set(buffs.BloodGemAttack, numeric, value => buffs.BloodGemAttack = value);
+            case "BACON_BLOODGEMBUFFHEALTHVALUE":
+                return Set(buffs.BloodGemHealth, numeric, value => buffs.BloodGemHealth = value);
+            case "BACON_ELEMENTAL_BUFFATKVALUE":
+                return Set(buffs.ElementalAttack, numeric, value => buffs.ElementalAttack = value);
+            case "BACON_ELEMENTAL_BUFFHEALTHVALUE":
+                return Set(buffs.ElementalHealth, numeric, value => buffs.ElementalHealth = value);
+            case "BACON_PIRATE_BUFFATKVALUE":
+                return Set(buffs.PirateAttack, numeric, value => buffs.PirateAttack = value);
+            case "BACON_PIRATE_BUFFHEALTHVALUE":
+                return Set(buffs.PirateHealth, numeric, value => buffs.PirateHealth = value);
+            default:
                 return false;
+        }
+
+        // Hra na začátku každého souboje všechny tyhle tagy vynuluje a o pár sekund později
+        // vrátí zpět. V jedné hře bonusy jen přibývají, takže návrat na nulu je vždycky jen
+        // ten průběžný reset a zahodí se; skutečnou nulu nastaví až nová hra.
+        static bool Set(int current, int incoming, Action<int> assign)
+        {
+            if (incoming == current || (incoming == 0 && current > 0))
+            {
+                return false;
+            }
+
+            assign(incoming);
+            return true;
         }
     }
 

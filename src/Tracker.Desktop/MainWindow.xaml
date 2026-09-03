@@ -265,16 +265,14 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <StackPanel>
-                                <TextBlock Text="BATTLEGROUNDS TRACKER" FontSize="14" FontWeight="Bold" />
-                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                    <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                    <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10" MaxWidth="300"
-                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding SourceTooltip}">
-                                        <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding GameMode, Mode=OneWay}" FontWeight="Bold" Foreground="#E6A23C" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
-                                    </TextBlock>
-                                    <!-- Verze hned za režimem. Ladicí build se odliší okrovou barvou
-                                         a rámečkem, aby se nedal splést s vydanou verzí. -->
-                                    <Border Margin="7,0,0,0" Padding="4,0,4,1" CornerRadius="3" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="TitleText" Text="BATTLEGROUNDS TRACKER" FontSize="14" FontWeight="Bold"
+                                               VerticalAlignment="Center" />
+                                    <!-- Verze hned za názvem. Výška odznáčku je svázaná s výškou titulku,
+                                         aby s ním dosedl na stejnou linku. Ladicí build se odliší okrovou
+                                         barvou a rámečkem, aby se nedal splést s vydanou verzí. -->
+                                    <Border Margin="8,0,0,0" Padding="5,0" CornerRadius="3" VerticalAlignment="Center"
+                                            Height="{Binding ActualHeight, ElementName=TitleText}">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Background" Value="#16202E" />
@@ -288,7 +286,8 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock Text="{Binding Version, Mode=OneWay}" FontSize="9" FontWeight="Bold">
+                                        <TextBlock Text="{Binding Version, Mode=OneWay}" FontSize="9" FontWeight="Bold"
+                                                   VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Foreground" Value="{StaticResource SecondaryText}" />
@@ -301,6 +300,13 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Border>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                    <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Foreground="{StaticResource SecondaryText}" FontSize="10" MaxWidth="330"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding SourceTooltip}">
+                                        <Run Text="{Binding ModeLabel, Mode=OneWay}" FontWeight="Bold" /><Run Text=" • " /><Run Text="{Binding GameMode, Mode=OneWay}" FontWeight="Bold" Foreground="#E6A23C" /><Run Text=" • " /><Run Text="{Binding SourceDescription, Mode=OneWay}" />
+                                    </TextBlock>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
@@ -322,8 +328,11 @@
                         <RowDefinition Height="9" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="9" />
-                        <!-- Rezervuje šest řádků událostí; víc místa dostane, když okno zvětšíte. -->
-                        <RowDefinition Height="*" MinHeight="159" />
+                        <!-- Události berou všechno, co zbyde, a mají vlastní scrollbar. MinHeight
+                             musí zůstat malá: karta má pevnou výšku, takže při zobrazení pruhu
+                             s načítáním nebo aktualizací se přebytek nemá kam vejít a odřízl by
+                             spodní lištu s tlačítky. -->
+                        <RowDefinition Height="*" MinHeight="60" />
                         <RowDefinition Height="9" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -375,6 +384,11 @@
                             <TextBlock Text="{Binding AvailableRaces}" Foreground="{StaticResource SecondaryText}" FontSize="10"
                                        Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
                                        ToolTip="Typy minionů, které se v této lobby objevily v nabídce Boba" />
+                            <!-- Bonusy pro celou hru. Řádek se schová, dokud žádný nenastane. -->
+                            <TextBlock Text="{Binding Buffs}" Foreground="#F4D06F" FontSize="10"
+                                       Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding HasBuffs, Converter={StaticResource BoolToVisibility}}"
+                                       ToolTip="Bonusy platné pro celou hru: o kolik víc dávají tavern kouzla a blood gemy a jaký plošný buff mají elementálové a piráti" />
                             <Grid Margin="9,8,9,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="32" />

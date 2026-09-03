@@ -72,6 +72,8 @@ Pilot umí:
   se statistikami, tierem, zlatou verzí a klíčovými slovy;
 - po najetí myší na hráče ukázat jeho poslední známou desku i s číslem kola;
 - vypsat typy minionů, které se v lobby objevily v nabídce Boba;
+- držet počítadlo bonusů platných pro celou hru: o kolik víc dávají tavern kouzla
+  a blood gemy a jaký plošný buff mají elementálové a piráti;
 - sledovat zlato, cenu upgradu tavernu, dalšího soupeře a historii soubojů;
 - zobrazit poslední významné události a diagnostiku parseru;
 - přehrát uložený log nebo vestavěnou syntetickou ukázku.

@@ -346,6 +346,32 @@ i `BACON_SUBSET_NAGA`. V démonní lobby bez nág se tedy může objevit v nabí
 navíc. Z těchto dvou důvodů je panel v UI popsaný jako „typy v nabídce“, ne jako oficiální
 seznam lobby.
 
+### 8.6b Bonusy platné pro celou hru
+
+Efekty jako „vaše tavern kouzla dávají +1/+1 víc“ nebo „blood gemy dávají +1/+1 víc“ se
+nikam na minion nezapisují. Hra si je drží jako čísla na **entitě hráče**, takže se čtou
+stejně jako zlato:
+
+| Co | Tag útoku | Tag života |
+| --- | --- | --- |
+| Tavern kouzla | `TAVERN_SPELL_ATTACK_INCREASE` | `TAVERN_SPELL_HEALTH_INCREASE` |
+| Blood gemy | `BACON_BLOODGEMBUFFATKVALUE` | `BACON_BLOODGEMBUFFHEALTHVALUE` |
+| Elementálové | `BACON_ELEMENTAL_BUFFATKVALUE` | `BACON_ELEMENTAL_BUFFHEALTHVALUE` |
+| Piráti | `BACON_PIRATE_BUFFATKVALUE` | `BACON_PIRATE_BUFFHEALTHVALUE` |
+
+Hodnota je vždy kumulativní součet za celou hru, ne přírůstek za jeden efekt, takže se
+jen zrcadlí do `TrackerState.Buffs`. V pozorovaném zápase vylétla po opakovaných
+battlecry Red Chromadrake s Brannem až na `+30/+22`.
+
+Jeden háček: **na začátku každého souboje hra všechny tyhle tagy vynuluje a o tři sekundy
+později je vrátí na starou hodnotu.** Nulování přichází už s `BACON_IN_COMBAT_PHASE=1`,
+takže kdyby se zrcadlilo, počítadlo by v každém souboji na několik sekund spadlo na
+`+0/+0`. Návrat na nulu se proto zahodí, dokud počítadlo drží vyšší hodnotu — v jedné hře
+tyhle bonusy jen přibývají a skutečnou nulu nastaví až nová hra přes `BeginGame()`.
+
+V UI je řádek `Bonusy: …` pod výpisem typů a ukazuje jen to, co v dané hře skutečně
+nastalo; když nic, řádek se schová a nebere místo.
+
 ### 8.7 Souboje a konečné umístění
 
 Přepnutí `BACON_IN_COMBAT_PHASE` na 1 zakládá nový `CombatRound` s číslem kola a slotem
@@ -759,6 +785,12 @@ principiálně nemohou. Místo pro maximální počet položek si rezervují nap
 Jediný scrollovatelný panel je `POSLEDNÍ UDÁLOSTI`. Ten zůstává interaktivní, aby v něm
 fungovalo kolečko myši i tažení scrollbaru.
 
+Právě proto má jeho řádek malou `MinHeight` (60), zatímco ostatní seznamy si místo rezervují
+napevno. Výška karty je pevná, takže když se nad spodní lištou objeví pruh s načítáním
+zápasu nebo s nabídkou aktualizace, přebytek se nemá kam vejít a mřížka odřízne poslední
+řádek — tedy tlačítka. Události mají scrollbar, a tak jsou jediný panel, který se smí
+zmenšit; s `MinHeight="159"` se lišta při načítání vybraného logu rozbíjela.
+
 Rozložení má dvě návrhové výšky: 1163 bodů s rozbalenými deskami a 879 se sbalenými.
 Ta první se nevejde na monitor s rozlišením 1920×1080, kde po odečtení hlavního panelu
 zbývá kolem 1010 bodů. Proto jde sekce s deskami sbalit klikem na její nadpis.
@@ -833,8 +865,9 @@ Panel zobrazuje události od nejnovější po nejstarší. `TrackerState`
 uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je na
 šest řádků navržený, takže se scrollbar objeví jen u delších zalomených textů.
 
-V hlavičce je za režimem čtení a herním režimem ještě verze. Ladicí build se pozná i barvou:
-okrový rámeček a okrové písmo místo tlumeného. Bez toho se dá snadno hodinu ladit něco, co
+V hlavičce je verze jako odznáček hned za názvem aplikace. Jeho výška je svázaná
+s `ActualHeight` titulku, takže sedí na stejné lince i kdyby se velikost názvu změnila.
+Ladicí build se pozná i barvou: okrový rámeček a okrové písmo místo tlumeného. Bez toho se dá snadno hodinu ladit něco, co
 vůbec neběží — přesně to se stalo, když vydaný Release zůstal o dva dny starší než opravený
 Debug.
 
@@ -1055,11 +1088,11 @@ Verze je vidět v patičce overlaye, v hlavičce konzolového dashboardu a přes
 `--version`.
 
 Verze se drží v `VersionPrefix` v `Directory.Build.props`. Ladicí build k ní dostane příponu
-přes `VersionSuffix`, takže hlásí `0.7.1-dev`, kdežto Release `0.7.1`. Vydává se jen Release, takže
+přes `VersionSuffix`, takže hlásí `0.8.0-dev`, kdežto Release `0.8.0`. Vydává se jen Release, takže
 spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
 
 `TrackerVersion` proto nabízí tři věci: `Current` s příponou pro zobrazení, `Numeric` bez ní pro
-porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.7.1-dev` selhalo) a `IsDevelopmentBuild`
+porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.8.0-dev` selhalo) a `IsDevelopmentBuild`
 pro odlišení v rozhraní.
 
 ### 14.2 Vydání nové verze

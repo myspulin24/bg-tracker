@@ -55,6 +55,9 @@ public sealed class TrackerState
     /// <summary>Cena upgradu na další tavern tier z tlačítka <c>TB_BaconShopTechUp*</c>.</summary>
     public int? TavernUpgradeCost { get; internal set; }
 
+    /// <summary>Bonusy platné pro celou hru: kouzla, blood gemy, elementálové, piráti.</summary>
+    public GlobalBuffs Buffs { get; } = new();
+
     /// <summary>Slot dalšího soupeře z tagu <c>NEXT_OPPONENT_PLAYER_ID</c>.</summary>
     public int? NextOpponentPlayerId { get; internal set; }
 
@@ -260,6 +263,7 @@ public sealed class TrackerState
         TempGold = null;
         MaxGold = null;
         TavernUpgradeCost = null;
+        Buffs.Reset();
         NextOpponentPlayerId = null;
         NextOpponentTeammatePlayerId = null;
         IsDuos = false;

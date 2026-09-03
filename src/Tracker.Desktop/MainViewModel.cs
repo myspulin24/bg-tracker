@@ -16,6 +16,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string nextOpponent = "Další soupeř: —";
     private string opposingBoardTitle = "NABÍDKA BOBA";
     private string availableRaces = "—";
+    private string buffs = string.Empty;
+    private bool hasBuffs;
     private string result = "—";
     private string diagnostics = $"{TrackerVersion.Display} • {TrackerVersion.Copyright} • 0 řádků / 0 událostí";
     private string pauseButtonText = "Pozastavit";
@@ -48,6 +50,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string NextOpponent { get => nextOpponent; private set => Set(ref nextOpponent, value); }
     public string OpposingBoardTitle { get => opposingBoardTitle; private set => Set(ref opposingBoardTitle, value); }
     public string AvailableRaces { get => availableRaces; private set => Set(ref availableRaces, value); }
+
+    /// <summary>Bonusy platné pro celou hru; prázdné, dokud žádný nenastane.</summary>
+    public string Buffs { get => buffs; private set => Set(ref buffs, value); }
+
+    public bool HasBuffs { get => hasBuffs; private set => Set(ref hasBuffs, value); }
     public string Result { get => result; private set => Set(ref result, value); }
     public string Diagnostics { get => diagnostics; private set => Set(ref diagnostics, value); }
     public string PauseButtonText { get => pauseButtonText; set => Set(ref pauseButtonText, value); }
@@ -97,6 +104,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AvailableRaces = state.AvailableRaces.Count == 0
             ? "Typy v nabídce: —"
             : "Typy: " + string.Join(" · ", state.AvailableRaces.Select(MinionRace.Display));
+        Buffs = BuffSummary(state.Buffs);
+        HasBuffs = Buffs.Length > 0;
         OpposingBoardTitle = state.IsCombatPhase ? "DESKA SOUPEŘE" : "NABÍDKA BOBA";
         GameMode = state.IsDuos ? "DUOS" : "SÓLO";
         Result = state.FinalPlace is { } finalPlace
@@ -260,6 +269,43 @@ public sealed class MainViewModel : INotifyPropertyChanged
     };
 
     private static string Value(int? value) => value?.ToString() ?? "—";
+
+    /// <summary>
+    /// Řádek s bonusy pro celou hru. Vypíše jen to, co v této hře skutečně nastalo, aby
+    /// v běžném zápase neubíral místo prázdnými nulami.
+    /// </summary>
+    private static string BuffSummary(GlobalBuffs buffs)
+    {
+        if (buffs.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>(4);
+        if (buffs.HasSpell)
+        {
+            parts.Add($"kouzla {Bonus(buffs.SpellAttack, buffs.SpellHealth)}");
+        }
+
+        if (buffs.HasBloodGem)
+        {
+            parts.Add($"blood gemy {Bonus(buffs.BloodGemAttack, buffs.BloodGemHealth)}");
+        }
+
+        if (buffs.HasElemental)
+        {
+            parts.Add($"elementálové {Bonus(buffs.ElementalAttack, buffs.ElementalHealth)}");
+        }
+
+        if (buffs.HasPirate)
+        {
+            parts.Add($"piráti {Bonus(buffs.PirateAttack, buffs.PirateHealth)}");
+        }
+
+        return "Bonusy: " + string.Join(" · ", parts);
+
+        static string Bonus(int attack, int health) => $"+{attack}/+{health}";
+    }
 
     private static string FirstUpper(string value) => string.IsNullOrEmpty(value)
         ? value
