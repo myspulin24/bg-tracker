@@ -166,3 +166,7 @@ if ($problems.Count -gt 0) {
 
 $label = if ($Tag) { "$Tag (VersionPrefix $prefix)" } else { "VersionPrefix $prefix" }
 Write-Host "Verzovani v poradku: $label, changelog ma $($released.Count) vydanych sekci." -ForegroundColor Green
+
+# Explicitní nula: bez ní zůstane $LASTEXITCODE u volajícího nenastavený a kontrola
+# `if ($LASTEXITCODE -ne 0)` ve workflow by úspěch vyhodnotila jako chybu.
+exit 0

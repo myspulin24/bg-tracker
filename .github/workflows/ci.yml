@@ -20,7 +20,9 @@ jobs:
       # a changelogem našel při commitu, ne až po pushnutí tagu.
       - name: Zkontrolovat verzování a changelog
         shell: pwsh
-        run: .\scripts\verify-version.ps1
+        run: |
+          .\scripts\verify-version.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       # Release build musí projít bez varování, protože Directory.Build.props
       # zapíná TreatWarningsAsErrors.
