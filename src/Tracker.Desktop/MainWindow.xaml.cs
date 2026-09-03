@@ -68,6 +68,7 @@ public partial class MainWindow : Window
     private int ticksSinceDiscovery;
     private TrackerMode mode;
     private readonly CancellationTokenSource updates = new();
+    private readonly MediaSessionWatcher media;
 
     public MainWindow()
     {
@@ -80,9 +81,25 @@ public partial class MainWindow : Window
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
         timer.Tick += Timer_Tick;
+        media = new MediaSessionWatcher(Dispatcher);
+        media.Updated += Media_Updated;
         Loaded += MainWindow_Loaded;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
+
+    private void Media_Updated(object? sender, EventArgs eventArgs) =>
+        viewModel.ApplyMedia(media.Current, media.Art);
+
+    // Příkazy nic nevracejí: nový stav přijde z ohlášené změny a chyby si hlídá sledovač sám,
+    // takže tu není co čekat ani co obsluhovat.
+    private void MediaPlayPauseButton_Click(object sender, RoutedEventArgs eventArgs) =>
+        _ = media.TogglePlayPauseAsync();
+
+    private void MediaNextButton_Click(object sender, RoutedEventArgs eventArgs) =>
+        _ = media.SkipNextAsync();
+
+    private void MediaPreviousButton_Click(object sender, RoutedEventArgs eventArgs) =>
+        _ = media.SkipPreviousAsync();
 
     private void ToggleBoardsButton_Click(object sender, RoutedEventArgs eventArgs) =>
         SetBoardsVisible(BoardsContent.Visibility != Visibility.Visible);
@@ -302,6 +319,7 @@ public partial class MainWindow : Window
 
         ApplyPendingUpdate();
         _ = CheckForUpdateAsync();
+        await media.StartAsync();
 
         var commandLineLog = ParseLogArgument(Environment.GetCommandLineArgs());
         if (commandLineLog is not null && PowerLogDiscovery.Find(commandLineLog) is { } explicitLog)
@@ -730,6 +748,8 @@ public partial class MainWindow : Window
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         timer.Stop();
         updates.Cancel();
+        media.Updated -= Media_Updated;
+        media.Dispose();
         matchArchive?.Dispose();
         base.OnClosed(eventArgs);
     }

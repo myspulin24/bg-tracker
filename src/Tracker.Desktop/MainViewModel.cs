@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 using Tracker.Core;
 
 namespace Tracker.Desktop;
@@ -32,6 +33,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private double loadProgress;
     private string loadStatus = string.Empty;
     private string sourceTooltip = string.Empty;
+
+    /// <summary>Glyfy z fontu Segoe MDL2 Assets: pauza a přehrát.</summary>
+    private const string PauseGlyph = "\uE769";
+    private const string PlayGlyph = "\uE768";
+
+    private string mediaTitle = string.Empty;
+    private string mediaSubtitle = string.Empty;
+    private ImageSource? mediaArt;
+    private bool hasMedia;
+    private string mediaPlayGlyph = PlayGlyph;
+    private string mediaPlayTooltip = "Přehrát hudbu";
+    private bool canMediaPlayPause;
+    private bool canMediaNext;
+    private bool canMediaPrevious;
     private readonly Dictionary<int, MinionViewModel[]> boardCache = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -89,6 +104,47 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Plná cesta ke zdroji; v hlavičce se vejde jen zkrácený popis.</summary>
     public string SourceTooltip { get => sourceTooltip; set => Set(ref sourceTooltip, value); }
+
+    /// <summary>Název skladby, u videa v prohlížeči jeho titulek.</summary>
+    public string MediaTitle { get => mediaTitle; private set => Set(ref mediaTitle, value); }
+
+    /// <summary>Interpret a přehrávač pod názvem skladby.</summary>
+    public string MediaSubtitle { get => mediaSubtitle; private set => Set(ref mediaSubtitle, value); }
+
+    /// <summary>Obal skladby; když ho přehrávač nedodá, zůstane v rámečku ikona noty.</summary>
+    public ImageSource? MediaArt { get => mediaArt; private set => Set(ref mediaArt, value); }
+
+    /// <summary>Hraje něco? Proužek s hudbou se jinak vůbec nezobrazuje.</summary>
+    public bool HasMedia { get => hasMedia; private set => Set(ref hasMedia, value); }
+
+    /// <summary>Glyf tlačítka přehrávání: pauza, když hraje, jinak přehrát.</summary>
+    public string MediaPlayGlyph { get => mediaPlayGlyph; private set => Set(ref mediaPlayGlyph, value); }
+
+    public string MediaPlayTooltip { get => mediaPlayTooltip; private set => Set(ref mediaPlayTooltip, value); }
+
+    /// <summary>
+    /// Tlačítka se řídí tím, co přehrávač hlásí jako podporované. Prohlížeč s jedním videem
+    /// například nezná další ani předchozí skladbu.
+    /// </summary>
+    public bool CanMediaPlayPause { get => canMediaPlayPause; private set => Set(ref canMediaPlayPause, value); }
+
+    public bool CanMediaNext { get => canMediaNext; private set => Set(ref canMediaNext, value); }
+
+    public bool CanMediaPrevious { get => canMediaPrevious; private set => Set(ref canMediaPrevious, value); }
+
+    /// <summary>Přenese do rozhraní, co hlásí systémové rozhraní pro média.</summary>
+    public void ApplyMedia(NowPlaying playing, ImageSource? art)
+    {
+        MediaTitle = playing.Title;
+        MediaSubtitle = playing.Subtitle;
+        MediaArt = art;
+        HasMedia = playing.HasTrack;
+        MediaPlayGlyph = playing.IsPlaying ? PauseGlyph : PlayGlyph;
+        MediaPlayTooltip = playing.IsPlaying ? "Pozastavit hudbu" : "Přehrát hudbu";
+        CanMediaPlayPause = playing.CanPlayPause;
+        CanMediaNext = playing.CanSkipNext;
+        CanMediaPrevious = playing.CanSkipPrevious;
+    }
 
     public void Update(TrackerState state)
     {

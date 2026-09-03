@@ -135,6 +135,12 @@
                                 <Setter TargetName="Body" Property="BorderBrush" Value="{StaticResource Accent}" />
                                 <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
                             </Trigger>
+                            <!-- Vlastní šablona nedědí zeslabení vypnutého tlačítka, takže by
+                                 nepoužitelné tlačítko vypadalo stejně jako funkční. Týká se
+                                 přeskakování skladeb: prohlížeč s jedním videem ho nepodporuje. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Body" Property="Opacity" Value="0.35" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

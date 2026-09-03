@@ -566,6 +566,58 @@
                                                  Foreground="{StaticResource Accent}" />
                                 </StackPanel>
                             </Border>
+                            <!-- Co právě hraje. Čte se ze systémového rozhraní pro média, takže je
+                                 tu Spotify, YouTube v prohlížeči i YouTube Music bez přihlašování.
+                                 Proužek je ve stejném stohu jako pruhy s aktualizací a načítáním,
+                                 protože ty se taky ukazují jen občas a skryté nezaberou místo.
+                                 Ukazatel postupu tu schválně není: přehrávače pozici ve skladbě do
+                                 systému průběžně neposílají, takže by stál na místě. -->
+                            <Border Background="#141E2C" BorderBrush="#2C3B52" BorderThickness="1" CornerRadius="6"
+                                    Padding="8,6" Margin="0,0,0,7"
+                                    Visibility="{Binding HasMedia, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="32" Height="32" CornerRadius="5" Background="#0C1521"
+                                            BorderBrush="#2C3B52" BorderThickness="1" Margin="0,0,9,0"
+                                            VerticalAlignment="Center" ClipToBounds="True">
+                                        <Grid>
+                                            <TextBlock Text="&#xE8D6;" Style="{StaticResource GlyphStyle}" FontSize="14"
+                                                       Foreground="{StaticResource SecondaryText}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Image Source="{Binding MediaArt}" Stretch="UniformToFill" />
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding MediaTitle}" FontSize="11" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding MediaSubtitle}" Foreground="{StaticResource SecondaryText}"
+                                                   FontSize="9.5" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                                Margin="8,0,0,0">
+                                        <Button x:Name="MediaPreviousButton" Style="{StaticResource IconButtonStyle}" Margin="0,0,5,0"
+                                                Click="MediaPreviousButton_Click" IsEnabled="{Binding CanMediaPrevious}"
+                                                ToolTip="Předchozí skladba">
+                                            <TextBlock Text="&#xE892;" Style="{StaticResource GlyphStyle}" FontSize="12" />
+                                        </Button>
+                                        <Button x:Name="MediaPlayPauseButton" Style="{StaticResource IconButtonStyle}" Margin="0,0,5,0"
+                                                Click="MediaPlayPauseButton_Click" IsEnabled="{Binding CanMediaPlayPause}"
+                                                ToolTip="{Binding MediaPlayTooltip}">
+                                            <TextBlock Text="{Binding MediaPlayGlyph}" Style="{StaticResource GlyphStyle}"
+                                                       FontSize="12" />
+                                        </Button>
+                                        <Button x:Name="MediaNextButton" Style="{StaticResource IconButtonStyle}"
+                                                Click="MediaNextButton_Click" IsEnabled="{Binding CanMediaNext}"
+                                                ToolTip="Další skladba">
+                                            <TextBlock Text="&#xE893;" Style="{StaticResource GlyphStyle}" FontSize="12" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </StackPanel>
                         <!-- Stav a diagnostika vlevo, ovládání vpravo jako dvě ikony. Samostatný
                              řádek s tlačítky zabíral v pevné výšce karty skoro 40 px. -->

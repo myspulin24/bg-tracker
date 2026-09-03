@@ -36,7 +36,8 @@ Stav dokumentace odpovídá implementaci k 1. září 2026.
 ## 2. Technologie a požadavky
 
 - C# a .NET 8;
-- WPF (`net8.0-windows`) pro desktopový overlay;
+- WPF (`net8.0-windows10.0.19041.0`) pro desktopový overlay; verze Windows v cíli otevírá
+  WinRT rozhraní, ze kterého čte proužek s hudbou, a stanoví minimum Windows 10 verze 2004;
 - konzolová aplikace na `net8.0`;
 - xUnit pro testy;
 - Windows, protože hlavní UI je WPF a automatická detekce hledá instalaci
@@ -56,8 +57,8 @@ projít bez varování.
 
 | Projekt / cesta | Odpovědnost |
 | --- | --- |
-| `src/Tracker.Core` | Parser `Power.log`, hledání instalace hry, geometrie okna, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder` a stahování kreseb a popisů karet. |
-| `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly, ovládání okna a okno s patch notes ve vestavěném prohlížeči. |
+| `src/Tracker.Core` | Parser `Power.log`, hledání instalace hry, geometrie okna, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder`, data proužku s hudbou a stahování kreseb a popisů karet. |
+| `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly, ovládání okna, čtení systémových relací médií a okno s patch notes ve vestavěném prohlížeči. |
 | `src/Tracker.App` | Původní konzolová varianta, replay a textový dashboard. |
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
 | `assets/bg-tracker.ico` | Ikona „BG“ pro `.exe` obou aplikací i pro okno overlaye v hlavním panelu. Obsahuje velikosti 16 až 256. |
@@ -960,6 +961,47 @@ prohlížeče. Totéž tlačítko je i v okně samotném a v chybovém hlášen�
 nepodařilo nastartovat. Data prohlížeče jdou do
 `%LOCALAPPDATA%\BattlegroundsTracker\webview2`, protože výchozí složka leží vedle `.exe`,
 kam nemusí být právo zápisu.
+
+### 11.3b Proužek s hudbou
+
+Nad spodní lištou se ukazuje, co právě hraje: obal, název, interpret se zdrojem a tlačítka
+předchozí, přehrát nebo pozastavit a další. Zdrojem je systémové rozhraní pro média
+`Windows.Media.Control`, tedy totéž, co obsluhuje okénko u tlačítek hlasitosti. Proto
+proužek vidí Spotify, YouTube v prohlížeči, YouTube Music i cokoli dalšího, co se hlásí
+Windows, **bez přihlašování, bez klíčů k API a bez Premium**.
+
+Ostatní cesty tuhle vlastnost nemají. Spotify Web API vyžaduje pro `/me/player` Premium
+a nová aplikace smí mít v *development mode* jen pět ručně povolených uživatelů; *extended
+quota mode* chce firmu s 250 000 aktivními uživateli měsíčně. YouTube navíc svými pravidly
+pro vývojáře zakazuje přehrávač, který není vidět, oddělování zvuku od videa, stahování
+i přístup mimo oficiální API, takže hudba z YouTube na pozadí legální cesta není.
+
+Sledovač je `MediaSessionWatcher` a stojí na naměřeném chování:
+
+- **Události se hlásí, ale dvakrát po sobě.** Proto je `NowPlaying` záznam se srovnáním
+  podle hodnot a shodný stav se zahazuje, jinak by se rozhraní překreslovalo dvojmo.
+- **Pozice ve skladbě stojí na místě.** Přehrávače ji do systému průběžně neposílají,
+  takže ukazatel postupu by lhal a v proužku žádný není.
+- **Identifikátor aplikace není na pohled k ničemu.** Edge se hlásí jako `MSEdge`, Spotify
+  jako `Spotify.exe` a Media Player jako `Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic`.
+  Překlad na čitelné jméno dělá `MediaSourceName.Friendly` a neznámý identifikátor se jen
+  očistí, aby v proužku nezůstalo prázdno.
+- **Tlačítka se řídí přehrávačem.** Prohlížeč s jedním videem nehlásí další ani předchozí
+  skladbu, takže se ta tlačítka zeslabí a nejdou zmáčknout.
+
+Události přicházejí na vlastním vlákně a přepočet se vrací na vlákno rozhraní; souběžné
+žádosti se slučují. Názvy a obal se vyzvedávají jen při změně skladby, protože to jsou
+volání do cizího procesu, zatímco stav přehrávání je zdarma. Každé dvě sekundy jde ještě
+záchranný přepočet, kdyby některý přehrávač změnu neohlásil. Obal se čte přes `DataReader`,
+protože rozšíření pro převod WinRT streamů v .NET 8 už není, a výsledný obrázek se zmrazí,
+aby se dal použít z vlákna rozhraní.
+
+Celé čtení i každý příkaz jsou v `try`: relace patří cizímu procesu, který může zmizet
+uprostřed volání, a proužek s hudbou nesmí shodit tracker. Když se rozhraní vůbec
+neotevře, proužek se jen neobjeví.
+
+Kvůli WinRT má `Tracker.Desktop` cíl `net8.0-windows10.0.19041.0`. Nejnižší podporovaná
+verze systému je tím Windows 10 verze 2004 a vydaná binárka roste o 6 MiB.
 
 ### 11.4 Aktualizace kolekcí
 

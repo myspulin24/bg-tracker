@@ -10,6 +10,24 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.9.3] - 2026-09-03
+
+### Přidáno
+
+- Proužek s hudbou nad spodní lištou: co právě hraje, obal, interpret a tlačítka předchozí,
+  přehrát nebo pozastavit a další. Čte se ze systémového rozhraní pro média
+  (`Windows.Media.Control`), takže bez jakéhokoli přihlašování, klíčů k API a bez Premium
+  ovládá Spotify, YouTube v prohlížeči, YouTube Music i cokoli dalšího, co se hlásí
+  Windows. Tlačítka se řídí tím, co přehrávač podporuje, a proužek se schová, když nic
+  nehraje. Ukazatel postupu ve skladbě záměrně chybí: přehrávače pozici do systému
+  průběžně neposílají, takže by stál na místě.
+
+### Změněno
+
+- Cíl `Tracker.Desktop` je `net8.0-windows10.0.19041.0` místo `net8.0-windows`, protože
+  bez verze Windows v cíli nejsou vidět WinRT rozhraní. Nejnižší podporovaná verze systému
+  je tím Windows 10 verze 2004; vydaná binárka kvůli projekci WinRT roste o 6 MiB.
+
 ## [0.9.2] - 2026-09-03
 
 ### Opraveno
@@ -226,7 +244,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.2...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/myspulin24/bg-tracker/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/myspulin24/bg-tracker/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/myspulin24/bg-tracker/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/myspulin24/bg-tracker/compare/v0.8.1...v0.9.0

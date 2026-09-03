@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Verze Windows v cíli otevírá WinRT rozhraní: proužek s hudbou čte
+         Windows.Media.Control, což bez ní není vidět. 10.0.19041 je Windows 10 verze 2004
+         z května 2020, tedy nejstarší, kterou Microsoft ještě podporuje. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <AssemblyName>BattlegroundsTracker</AssemblyName>
     <ApplicationIcon>..\..\assets\bg-tracker.ico</ApplicationIcon>
