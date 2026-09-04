@@ -192,7 +192,12 @@ Desktop má tři interní režimy:
    i souboj.
 
 Při startu má přednost explicitní argument `--log`, potom aktuální automaticky nalezený
-log a nakonec režim naslouchání. V současné implementaci má automaticky zjištěná živá
+log a nakonec režim naslouchání. Od 0.10.1 se explicitní log čte **živě jen tehdy, když
+patří běžící hře** (`IsCurrentSessionLog`, tedy poslední zápis je novější než start procesu
+Hearthstone mínus minuta); jinak se přehraje. Bez toho zakládal každý spuštěný `--log` nový
+záznam v archivu zápasů a přepsal checkpoint, takže retence na pěti zápasech vytlačila
+skutečně odehrané hry. Přehrávání do `%LOCALAPPDATA%` nezapisuje vůbec nic.
+V současné implementaci má automaticky zjištěná živá
 hra přednost i během timeru dema. Je-li Hearthstone aktivní, může proto demo přejít zpět
 do live režimu. Toto je známé chování vhodné k pozdější úpravě, pokud má uživatelsky
 spuštěné demo zůstat izolované.
