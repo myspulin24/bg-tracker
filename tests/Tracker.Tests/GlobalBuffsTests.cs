@@ -38,6 +38,62 @@ public sealed class GlobalBuffsTests
         GameState + "TAG_CHANGE Entity=Hráč#21600 tag=HERO_ENTITY value=116"
     ];
 
+    /// <summary>
+    /// Útok undeadů není na entitě hráče: tag <c>UNDEAD_ATTACK_BUFF</c> z enumu hry se v logu
+    /// nevyskytuje a hodnotu nese enchantment hráče <c>BG25_011pe</c>
+    /// v <c>TAG_SCRIPT_DATA_NUM_1</c>. Naměřeno na kartě Nerubian Deathswarmer.
+    /// </summary>
+    [Fact]
+    public void TracksUndeadAttackFromThePlayerEnchantment()
+    {
+        var tracker = Replay([
+            .. Opening(),
+            GameState + "FULL_ENTITY - Creating ID=4123 CardID=BG25_011pe",
+            GameState + "    tag=CONTROLLER value=7",
+            GameState + "    tag=ZONE value=PLAY",
+            GameState + "TAG_CHANGE Entity=[entityName=Undead Bonus Attack Player Enchant [DNT] id=4123 zone=PLAY zonePos=0 cardId=BG25_011pe player=7] tag=TAG_SCRIPT_DATA_NUM_1 value=11"
+        ]);
+
+        Assert.Equal(11, tracker.State.Buffs.UndeadAttack);
+        Assert.True(tracker.State.Buffs.HasUndead);
+        Assert.False(tracker.State.Buffs.IsEmpty);
+    }
+
+    /// <summary>
+    /// Enchantment se každým soubojem přegeneruje a ten odcházející dostane nulu, ačkoli bonus
+    /// platí dál. Zahazuje se proto stejně jako nulování tagů.
+    /// </summary>
+    [Fact]
+    public void KeepsUndeadAttackWhenTheOldEnchantmentIsZeroed()
+    {
+        var tracker = Replay([
+            .. Opening(),
+            GameState + "FULL_ENTITY - Creating ID=4123 CardID=BG25_011pe",
+            GameState + "    tag=CONTROLLER value=7",
+            GameState + "    tag=ZONE value=PLAY",
+            GameState + "    tag=TAG_SCRIPT_DATA_NUM_1 value=11",
+            GameState + "TAG_CHANGE Entity=[entityName=Undead Bonus Attack Player Enchant [DNT] id=4123 zone=PLAY zonePos=0 cardId=BG25_011pe player=7] tag=TAG_SCRIPT_DATA_NUM_1 value=0"
+        ]);
+
+        Assert.Equal(11, tracker.State.Buffs.UndeadAttack);
+    }
+
+    /// <summary>Enchantment má každý hráč vlastní; do panelu patří jen ten lokální.</summary>
+    [Fact]
+    public void IgnoresUndeadAttackOfAnotherPlayer()
+    {
+        var tracker = Replay([
+            .. Opening(),
+            GameState + "FULL_ENTITY - Creating ID=11579 CardID=BG25_011pe",
+            GameState + "    tag=CONTROLLER value=15",
+            GameState + "    tag=ZONE value=PLAY",
+            GameState + "    tag=TAG_SCRIPT_DATA_NUM_1 value=42"
+        ]);
+
+        Assert.Equal(0, tracker.State.Buffs.UndeadAttack);
+        Assert.False(tracker.State.Buffs.HasUndead);
+    }
+
     [Fact]
     public void TracksSpellBloodGemElementalAndPirateBuffs()
     {

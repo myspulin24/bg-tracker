@@ -18,7 +18,9 @@ public sealed record BoardMinion(
     bool HasReborn,
     bool HasVenomous,
     bool HasWindfury,
-    int? Cost)
+    int? Cost,
+    int? ScriptDataNum1 = null,
+    int? ScriptDataNum2 = null)
 {
     /// <summary>Statistiky ve tvaru <c>3/4</c>; pokud nejsou známé, vrací pomlčku.</summary>
     public string Stats => Attack is null && Health is null
@@ -55,7 +57,9 @@ public sealed record BoardMinion(
         entity.HasReborn,
         entity.HasVenomous || entity.HasPoisonous,
         entity.HasWindfury,
-        entity.Cost);
+        entity.Cost,
+        entity.ScriptDataNum1,
+        entity.ScriptDataNum2);
 
     private static void Append(StringBuilder builder, bool present, string label)
     {

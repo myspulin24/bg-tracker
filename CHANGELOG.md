@@ -10,6 +10,55 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.10.0] - 2026-09-04
+
+### Přidáno
+
+- **Útok undeadů** jako pátý bonus pro celou hru. Na entitě hráče ho hra nedrží — tag
+  `UNDEAD_ATTACK_BUFF` sice v enumu hry existuje, ale v žádném pozorovaném logu nepadl.
+  Hodnotu nese enchantment hráče `BG25_011pe` v `TAG_SCRIPT_DATA_NUM_1`; naměřeno na kartě
+  Nerubian Deathswarmer, kde vyrostla z 5 na 25 a v jiné hře až na 255. Život se u undeadů
+  takhle nebuffuje, proto má tenhle bonus jen jednu hodnotu.
+- Boční panel vpravo od hlavní karty se třemi sekcemi. **Bonusy pro celou hru** jsou v něm
+  rozepsané po řádcích místo jedné zkrácené věty: tavern kouzla, blood gemy, elementálové,
+  piráti a útok undeadů. **Trinkety** ukazují jméno vybraného trinketu, a
+  dokud je slot prázdný, odpočet do výběru v kolech. **Ekonomika krčmy** vypisuje zlato
+  k utracení i strop kola, kolik už v kole padlo, cenu rerollu, počet volných rerollů, cenu
+  upgradu tavernu a oba bonusy zlata.
+- Panel se skrývá tlačítkem v hlavičce; okno se pak zúží zpátky na původní šířku a bonusy se
+  vrátí na řádek do karty lobby.
+- Nové čtené hodnoty: cena rerollu a volné rerolly z tlačítka krčmy, zlato navíc na příští
+  kolo z entity hráče, strop tavern tieru a oba sloty na trinkety s odpočtem.
+- Po najetí myší na trinket se ukáže popis jeho efektu z databáze karet. Card ID se hledá ve
+  dvou krocích, protože u druhého slotu ho hra v entitě nevymění: nejdřív z entity slotu, pak
+  podle jména mezi nabídkami k výběru.
+- Sekce **Bonusy na kartách** vypisuje karty na desce, které si samy zvyšují hodnotu, tedy ty
+  s textem „and improve this“. Hra je drží na kartě, ne na entitě hráče, a text karty přitom
+  pořád ukazuje výchozí čísla: Spark Snapperův satelit vyrostl z 2/2 na 28/28, což jinde než
+  v jeho počítadle není.
+- Ekonomika má dva trvalé řádky s bonusy zlata: **bonus toto kolo** je zlato nad strop, které
+  přišlo z karet zahraných minule, **bonus příští kolo** přibývá z karet zahraných teď. Oba se
+  ukazují i v nule, aby bylo vidět i to, že bonus není. Bez prvního z nich vypadal poměr
+  `20/11` jako chyba.
+
+### Změněno
+
+- Řádky v ekonomice se jmenují **cena rerollu** a **cena upgradu**, aby bylo poznat, že to
+  není počet, ale cena ve zlatě. Popisky mají k tomu vysvětlení po najetí myší.
+
+### Opraveno
+
+- Build, který neprošel vydáním, se netvářil jako vydaná verze — ale jen když se stavěl
+  s `-c Debug`. Podmínka na příponu `-dev` byla v `Directory.Build.props` na `Configuration`,
+  a ten tam ještě nemusí být dosazený, protože se soubor vyhodnocuje před výchozími hodnotami
+  SDK. `dotnet build` bez parametru tak vyrobil binárku hlásící `0.9.3` místo `0.9.3-dev`.
+  Podmínka je teď na `Version`, kterou zadává jedině vydání, takže značku dostane i Release
+  build ze stroje.
+- Karty s vlastním počítadlem ukazovaly obě čísla jako `20/22`, což tvrdilo, že je bonus
+  nesouměrný. Změřeno, že jedno počítadlo drží nasčítaný přírůstek a druhé výslednou hodnotu:
+  při `NUM_1` = 26 a `NUM_2` = 28 dostal minion na desce +28/+28. Vypisuje se proto jen to
+  vyšší jako jedno číslo.
+
 ## [0.9.3] - 2026-09-03
 
 ### Přidáno
@@ -244,7 +293,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.9.3...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/myspulin24/bg-tracker/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/myspulin24/bg-tracker/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/myspulin24/bg-tracker/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/myspulin24/bg-tracker/compare/v0.9.0...v0.9.1

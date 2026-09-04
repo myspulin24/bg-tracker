@@ -40,6 +40,25 @@ public sealed class TrackedEntity(int entityId)
     public bool IsHero { get; internal set; }
 
     /// <summary>
+    /// Slot na trinket: 1 malý, 2 velký. Bere se z karty, se kterou entita vznikla, a už se
+    /// nemění — po výběru trinketu se totiž tatáž entita přepíše na vybranou kartu a jinak by
+    /// se slot nedal poznat.
+    /// </summary>
+    public int? TrinketSlot { get; internal set; }
+
+    /// <summary>Odpočet kol do výběru trinketu z tagu <c>BACON_TURNS_LEFT_TO_DISCOVER_TRINKET</c>.</summary>
+    public int? TrinketTurnsLeft { get; internal set; }
+
+    /// <summary>
+    /// Vlastní počítadla karty (<c>TAG_SCRIPT_DATA_NUM_1</c> a <c>_2</c>). Karty typu
+    /// „a zlepši tohle“ si v nich drží hodnotu, kterou právě dávají; v textu karty jí odpovídá
+    /// zástupný <c>SDN1</c>.
+    /// </summary>
+    public int? ScriptDataNum1 { get; internal set; }
+
+    public int? ScriptDataNum2 { get; internal set; }
+
+    /// <summary>
     /// Dočasná kopie hrdiny vyrobená jen pro souboj (tag <c>BACON_COMBAT_PHASE_HERO</c>). Má znovu
     /// plné HP bez nasčítaného poškození, takže se z ní nesmí číst stav hráče v lobby.
     /// </summary>
@@ -48,6 +67,9 @@ public sealed class TrackedEntity(int entityId)
 
     /// <summary>Minion z nabídkového poolu této lobby (tag <c>IS_BACON_POOL_MINION</c>).</summary>
     public bool IsPoolMinion { get; internal set; }
+
+    /// <summary>Trinket (tag <c>BACON_TRINKET</c>); nese ho i nabídka k výběru.</summary>
+    public bool IsTrinket { get; internal set; }
     public bool HasTaunt { get; internal set; }
     public bool HasDivineShield { get; internal set; }
     public bool HasReborn { get; internal set; }

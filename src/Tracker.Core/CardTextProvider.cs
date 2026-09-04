@@ -44,6 +44,25 @@ public sealed class CardTextProvider
     public string CachePath => cachePath;
 
     /// <summary>
+    /// Už načtená tabulka popisů, nebo prázdná, dokud se nedonačte. Slouží dotazům z vlákna
+    /// rozhraní, které se musejí rozhodnout hned: <see cref="LoadAsync" /> doplňuje popis
+    /// asynchronně, takže kdo se ptá v témže okamžiku, dostal by ještě prázdno.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Loaded
+    {
+        get
+        {
+            lock (gate)
+            {
+                load ??= LoadCoreAsync();
+                return load is { IsCompletedSuccessfully: true } ready
+                    ? ready.Result
+                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    /// <summary>
     /// Načte popisy, ať už z uložené kopie, nebo stažením. Volat se dá opakovaně, ale stahuje
     /// jen jednou; při neúspěchu vrátí prázdnou tabulku a kartička se vykreslí bez popisu.
     /// </summary>

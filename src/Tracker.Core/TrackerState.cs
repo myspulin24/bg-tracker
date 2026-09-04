@@ -55,6 +55,37 @@ public sealed class TrackerState
     /// <summary>Cena upgradu na další tavern tier z tlačítka <c>TB_BaconShopTechUp*</c>.</summary>
     public int? TavernUpgradeCost { get; internal set; }
 
+    /// <summary>
+    /// Cena rerollu z tagu <c>COST</c> na tlačítku <c>TB_BaconShop_8p_Reroll_Button</c>. Nemusí
+    /// být jedna: efekty ji zlevňují a při volném rerollu je nula.
+    /// </summary>
+    public int? RefreshCost { get; internal set; }
+
+    /// <summary>
+    /// Kolik rerollů zbývá zdarma (tag <c>BACON_FREE_REFRESH_COUNT</c> na témže tlačítku).
+    /// Naměřený průběh 2 → 4 → 3 → 2 → 1 ukazuje, že jde o živé počítadlo, ne o součet za hru.
+    /// </summary>
+    public int? FreeRefreshes { get; internal set; }
+
+    /// <summary>
+    /// Zlato, které hráč dostane navíc příští kolo (tag
+    /// <c>BACON_PLAYER_EXTRA_GOLD_NEXT_TURN</c> na entitě hráče). Na rozdíl od bonusů pro celou
+    /// hru se po utracení skutečně vrací na nulu.
+    /// </summary>
+    public int? ExtraGoldNextTurn { get; internal set; }
+
+    /// <summary>
+    /// Strop tavern tieru z tagu <c>BACON_MAX_PLAYER_TECH_LEVEL</c>. Na něm se cena upgradu
+    /// přestane hlásit, takže bez téhle hodnoty nejde poznat, jestli chybí, nebo je zbytečná.
+    /// </summary>
+    public int? MaxTavernTier { get; internal set; }
+
+    /// <summary>Malý trinket lokálního hráče, nebo odpočet, dokud si ho nevybere.</summary>
+    public Trinket? LesserTrinket => TrinketSlot(1);
+
+    /// <summary>Velký trinket lokálního hráče, nebo odpočet, dokud si ho nevybere.</summary>
+    public Trinket? GreaterTrinket => TrinketSlot(2);
+
     /// <summary>Bonusy platné pro celou hru: kouzla, blood gemy, elementálové, piráti.</summary>
     public GlobalBuffs Buffs { get; } = new();
 
@@ -263,6 +294,10 @@ public sealed class TrackerState
         TempGold = null;
         MaxGold = null;
         TavernUpgradeCost = null;
+        MaxTavernTier = null;
+        RefreshCost = null;
+        FreeRefreshes = null;
+        ExtraGoldNextTurn = null;
         Buffs.Reset();
         NextOpponentPlayerId = null;
         NextOpponentTeammatePlayerId = null;
@@ -355,6 +390,52 @@ public sealed class TrackerState
 
         return true;
     }
+
+    /// <summary>
+    /// Slot na trinket lokálního hráče. Entita slotu žije celou hru a nepřegeneruje se se
+    /// soubojem, takže se tu na rozdíl od desky nefiltruje podle generace. Jméno se bere jen
+    /// tehdy, když už v entitě není jméno prázdného slotu — jinak by se v panelu objevilo
+    /// „Lesser Trinket“ místo odpočtu.
+    ///
+    /// Prázdných slotů vyrobí hra za zápas desítky: platí jen ten jeden v <c>PLAY</c>, ostatní
+    /// leží v <c>SETASIDE</c> nebo ve hřbitově a nesou odpočet ze začátku hry. Bez filtru na
+    /// zónu tak panel ukazoval odpočet i dlouho po tom, co byl trinket vybraný.
+    /// </summary>
+    private Trinket? TrinketSlot(int slot)
+    {
+        if (LocalControllerId is not { } controller)
+        {
+            return null;
+        }
+
+        var entity = entities.Values
+            .Where(candidate => candidate.TrinketSlot == slot &&
+                                candidate.ControllerId == controller &&
+                                candidate.IsInPlay)
+            .OrderByDescending(candidate => candidate.EntityId)
+            .FirstOrDefault();
+        if (entity is null)
+        {
+            return null;
+        }
+
+        var chosen = Trinket.IsPlaceholderName(entity.Name) ? null : entity.Name;
+
+        // Karta slouží k dohledání popisu efektu. Prázdný slot vlastní kartu nemá, a když ji
+        // hra po výběru v entitě slotu ani nevymění (naměřeno u velkého trinketu), zbývá
+        // dohledat ji podle jména mezi nabídkami — ty kartu nesou vždycky.
+        var card = Trinket.SlotFromCardId(entity.CardId) is null ? entity.CardId : TrinketCard(chosen);
+        return new Trinket(slot, chosen, entity.TrinketTurnsLeft, card);
+    }
+
+    /// <summary>Karta trinketu daného jména, hledaná mezi entitami s příznakem trinketu.</summary>
+    private string? TrinketCard(string? name) => name is null
+        ? null
+        : entities.Values
+            .FirstOrDefault(candidate => candidate.IsTrinket &&
+                                         string.Equals(candidate.Name, name, StringComparison.Ordinal) &&
+                                         candidate.CardId is not null)
+            ?.CardId;
 
     private IReadOnlyList<BoardMinion> Board(int? controllerId) => controllerId is not { } controller
         ? []

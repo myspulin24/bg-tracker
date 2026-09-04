@@ -29,4 +29,16 @@ public sealed class StatFormatTests
         Assert.Equal("?", StatFormat.Compact(null, "?"));
         Assert.Equal("2,4k", StatFormat.Compact(2400));
     }
+
+    /// <summary>Odpočet do trinketu se vypisuje česky, takže musí skloňovat.</summary>
+    [Theory]
+    [InlineData(1, "za 1 kolo")]
+    [InlineData(2, "za 2 kola")]
+    [InlineData(4, "za 4 kola")]
+    [InlineData(5, "za 5 kol")]
+    [InlineData(8, "za 8 kol")]
+    [InlineData(0, "už tohle kolo")]
+    [InlineData(-1, "už tohle kolo")]
+    public void DeclinesTheTurnCountdown(int turns, string expected) =>
+        Assert.Equal(expected, StatFormat.TurnsLeft(turns));
 }

@@ -408,8 +408,33 @@ takže kdyby se zrcadlilo, počítadlo by v každém souboji na několik sekund 
 `+0/+0`. Návrat na nulu se proto zahodí, dokud počítadlo drží vyšší hodnotu — v jedné hře
 tyhle bonusy jen přibývají a skutečnou nulu nastaví až nová hra přes `BeginGame()`.
 
+#### Útok undeadů je jinde
+
+Pátý bonus téhle skupiny, „your Undead have +X Attack this game“, se **na entitě hráče
+nevyskytuje**. V enumu hry tag `UNDEAD_ATTACK_BUFF` existuje (najde se v
+`Hearthstone_Data/Managed/Assembly-CSharp.dll`), ale v žádném pozorovaném logu ani jednou
+nepadl. Rodina `*BUFF*VALUE*` má v assembly jen blood gemy, elementály a piráty.
+
+Hodnotu místo toho nese **enchantment na hráči**: `Undead Bonus Attack Player Enchant [DNT]`
+s kartou `BG25_011pe`, v `TAG_SCRIPT_DATA_NUM_1`. Naměřeno na kartě Nerubian Deathswarmer
+(`BG25_011`, „Battlecry: Your Undead have +1 Attack this game“): v jedné hře hodnota rostla
+5 → 6 → 10 → 11 → 12 → … → 25 a v jiné vyšplhala na 255. Tentýž součet se zrcadlí i na
+enchantmentech jednotlivých undeadů (`Undead Army`, `BG25_011e2`).
+
+Každý hráč má vlastní takový enchantment, takže se filtruje na controller lokálního hráče,
+a nula se zahazuje ze stejného důvodu jako u tagů: enchantment se každým soubojem
+přegeneruje a ten odcházející dostane nulu, ačkoli bonus platí dál.
+
+Life se u undeadů takhle nebuffuje, proto má tenhle bonus jen jednu hodnotu.
+
+Stejný mechanismus mají i další „this game“ efekty, každý se svou kartou: `BG31_808pe`
+pro beetly (+3/+2), `BG25_008pe` pro počet padlých Eternal Knightů, `BG35_152pe` pro buff
+minionů v krčmě. Zapojený je zatím jen ten pro undeady, protože k ostatním nejsou naměřená
+data.
+
 V UI je řádek `Bonusy: …` pod výpisem typů a ukazuje jen to, co v dané hře skutečně
-nastalo; když nic, řádek se schová a nebere místo.
+nastalo; když nic, řádek se schová a nebere místo. V bočním panelu má každý bonus vlastní
+řádek (viz 11.3a).
 
 ### 8.7 Souboje a konečné umístění
 
@@ -631,6 +656,80 @@ Kromě `GameEntity` má tag `TURN` i entita lokálního hráče, kde jde o poče
 tahů. Ten roste zhruba poloviční rychlostí a bez omezení na `GameEntity` by kolo v UI
 zamrzlo přibližně na polovině skutečné hodnoty.
 
+### 9.14 Slot na trinket je jedna entita, která se přepíše
+
+Každý hráč má dvě entity slotů na trinket a ty žijí celou hru. Dokud je slot prázdný, jmenuje
+se `Lesser Trinket` nebo `Greater Trinket`, má kartu `BG30_Trinket_1st` / `BG30_Trinket_2nd`
+a nese odpočet `BACON_TURNS_LEFT_TO_DISCOVER_TRINKET`. **Po výběru se tatáž entita přepíše na
+vybraný trinket** řádkem `CHANGE_ENTITY`, takže slot se pozná jen podle karty, se kterou
+entita vznikla; proto se označení slotu ukládá při prvním přiřazení karty a už se nemění.
+
+Dvě věci k tomu bylo nutné naměřit:
+
+- **Prázdných slotů vyrobí hra za zápas desítky.** V jedné session jich bylo pro dva hráče
+  sedmnáct, všechny s odpočtem ze začátku hry a v zóně `REMOVEDFROMGAME`. Platí jen ten jeden
+  v `PLAY`; bez filtru na zónu ukazoval panel odpočet i dlouho po tom, co byl trinket vybraný.
+- **Jméno a karta se nemění zároveň.** Jméno se obnoví z kteréhokoli descriptoru, kdežto karta
+  až tehdy, když entitu zmíní řádek s novým `cardId`. Naměřeno na zápase, kde první slot měl
+  po výběru obojí (`Lovely Locket`, `BG36_MagicItem_211`), ale druhý jen jméno
+  (`Beatboxer Portrait` s pořád ještě kartou `BG30_Trinket_2nd`). Obsazenost slotu se proto
+  pozná po jménu, které je zároveň to, co se v panelu vypisuje.
+
+### 9.15 Ekonomika krčmy sedí na tlačítkách, ne na hráči
+
+Cena rerollu (`COST`) i počet volných rerollů (`BACON_FREE_REFRESH_COUNT`) jsou na tlačítku
+`TB_BaconShop_8p_Reroll_Button` daného hráče, cena upgradu na tlačítkách
+`TB_BaconShopTechUpNN_Button`. Volné rerolly hra píše i na pomocnou enchantment entitu
+`Bacon_Free_Refresh_Player_Ench`, ale stav, který uživatel vidí, drží tlačítko: naměřený průběh
+2 → 4 → 3 → 2 → 1 odpovídá dvěma přírůstkům a postupnému utrácení.
+
+Zlato navíc na příští kolo (`BACON_PLAYER_EXTRA_GOLD_NEXT_TURN`) je naopak na entitě hráče
+jako bonusy pro celou hru, ale **nesmí se na něj použít jejich pravidlo o zahazování nuly**:
+po utracení se skutečně vrací na nulu, kdežto bonusy se vracejí na starou hodnotu.
+
+Strop tavern tieru (`BACON_MAX_PLAYER_TECH_LEVEL`, hodnota 6) je na entitách hrdinů a platí
+pro celou lobby. Bez něj nejde poznat, jestli cena upgradu chybí, nebo jestli je hráč na
+posledním tieru, kde ji hra přestane posílat.
+
+`BACON_SELL_VALUE` je proti tomu na každém minionovi zvlášť, takže nejde o ekonomiku hráče,
+ale o cenu prodeje jedné karty.
+
+Zlato navíc se v kole, kdy se uplatní, objeví jako `TEMP_RESOURCES`. Proto může být k utracení
+víc, než kolik kolo dává, a proto má panel řádek „z toho navíc“ — bez něj vypadá poměr
+`20/11` jako chyba.
+
+### 9.16 Bonus, který karta drží sama
+
+Ne každý bonus platný pro celou hru je na entitě hráče. Na entitě jsou jen čtyři: tavern kouzla,
+blood gemy, elementálové a piráti (viz 8.6b). Karty typu „**and improve this**“ si hodnotu, kterou
+právě dávají, drží samy v `TAG_SCRIPT_DATA_NUM_1` a `_2`.
+
+Naměřeno na kartě **Spark Snapper** (`BG36_851`, „Whenever you play a Mech, Magnetize a 2/2
+Satellite to it and improve this“): text karty v databázi pořád tvrdí 2/2, ale počítadla během
+zápasu vyrostla na 26 a 28. Bez nich tedy skutečnou hodnotu satelitů zjistit nelze.
+
+**Co ta dvě čísla znamenají**, se muselo změřit, protože nesouměrné 26/28 nedává smysl. Obě
+rostou po dvou a `NUM_2` je vždycky `NUM_1 + 2`, tedy základ karty. Rozhodl skok statistik na
+desce: ve chvíli, kdy `NUM_1` = 26 a `NUM_2` = 28, dostal `Polarizing Beatboxer` +28 útoku
+(619 → 647) a +28 života (673 → 701). **`NUM_1` je tedy nasčítaný přírůstek nad základ 2/2
+a `NUM_2` je výsledná hodnota**, kterou karta právě dává. Panel proto z obou počítadel vypisuje
+to vyšší jako jedno číslo; `26/28` by tvrdilo, že je satelit nesouměrný, což není.
+
+Počítadla se navíc při přechodu do souboje nulují, ale **na odcházející entitě**: hodnotu 2, 4, 6
+nesla entita 11386, pak dostala nulu a nová entita 13719 pokračovala od 8. Deska se filtruje
+podle generace, takže se do panelu dostane jen ta nová se správnou hodnotou.
+
+Ostatní karty používají tatáž počítadla k vnitřní evidenci: `Scrap Scraper` má
+`TAG_SCRIPT_DATA_NUM_1` = 2 a jeho text („Deathrattle: Get a random Magnetic Mech“) žádné číslo
+nemá. Panel proto vypisuje jen karty, jejichž text obsahuje „improve this“ — u nich se hodnota
+z počítadla od čísel v textu doopravdy liší. Filtr je na anglickém textu z databáze karet, takže
+jinak formulovanou rostoucí kartu mine; radši nic než nesrozumitelné číslo.
+
+Text se čte z `CardTextProvider.Loaded`, tedy ze synchronního náhledu na už načtenou tabulku.
+Přes `CardInfo` to nešlo: ten se doplňuje asynchronně, takže v okamžiku, kdy karta na desce
+přibude, je jeho popis ještě prázdný a sekce by se objevila až o jeden přepočet později — a při
+přehrávání hotového logu, kde po posledním řádku žádný další přepočet nepřijde, vůbec.
+
 ## 10. Samostatný log každého zápasu a checkpoint
 
 ### 10.1 Proč se neupravuje Blizzard Power.log
@@ -786,9 +885,10 @@ okna, nikoli parseru.
 
 ### 11.2 Poměrová velikost a pravidlo bez scrollu
 
-Rozložení se sází v návrhových jednotkách 500 × 1163 a celý obsah je zabalený do `Viewbox`
-se `Stretch="Uniform"`. Okno se pak nastaví na návrhovou velikost vynásobenou zvětšením, takže
-overlay zabere stejný podíl obrazovky na FullHD i na 4K a nic se neořezává ani nescrolluje.
+Rozložení se sází v návrhových jednotkách 736 × 1163, z toho 500 zabírá hlavní karta a 236
+boční panel (viz 11.3a). Celý obsah je zabalený do `Viewbox` se `Stretch="Uniform"`. Okno se
+pak nastaví na návrhovou velikost vynásobenou zvětšením, takže overlay zabere stejný podíl
+obrazovky na FullHD i na 4K a nic se neořezává ani nescrolluje.
 
 Zvětšení se počítá z **výšky pracovní plochy**, ne z počtu pixelů:
 
@@ -800,12 +900,12 @@ Pixely by byly špatná míra, protože `SystemParameters.WorkArea` je v jednotk
 DPI. Na 4K se 200% zvětšením Windows už jednou zvětšily samy a druhé násobení podle pixelů by
 overlay nafouklo na dvojnásobek. Naměřené hodnoty:
 
-| pracovní plocha | zvětšení | okno |
-| --- | --- | --- |
-| 900 (malý notebook) | 0,73 | 364 × 846 |
-| 1040 (FullHD) | 0,84 | 420 × 978 |
-| 1392 | 1,13 | 563 × 1308 |
-| 1800 (4K při 100 %) | 1,30 | 650 × 1512 |
+| pracovní plocha | zvětšení | okno s panelem | bez panelu |
+| --- | --- | --- | --- |
+| 900 (malý notebook) | 0,73 | 537 × 846 | 364 × 846 |
+| 1040 (FullHD) | 0,84 | 618 × 978 | 420 × 978 |
+| 1392 | 1,13 | 828 × 1308 | 563 × 1308 |
+| 1800 (4K při 100 %) | 1,30 | 957 × 1512 | 650 × 1512 |
 
 Meze zvětšení jsou tam kvůli čitelnosti: bez dolní by se na malém monitoru zdrobnila písmena
 k nečitelnosti, bez horní by overlay na velkém zabral půl obrazovky. Když by plné rozložení
@@ -821,7 +921,8 @@ min(1163, max(640, výška pracovní plochy - 24))     rozbalené
 min(879,  max(640, výška pracovní plochy - 24))     sbalené
 ```
 
-Šířka je 500 a minimální šířka 440. Návrhové výšky pokrývají nejhorší možný obsah:
+Šířka hlavní karty je 500 a s bočním panelem 736; minimální šířka okna je 440.
+Návrhové výšky pokrývají nejhorší možný obsah:
 osm hráčů lobby, sedm minionů vlastní desky, sedm karet v nabídce Boba nebo na desce
 soupeře a šest posledních událostí.
 
@@ -961,6 +1062,40 @@ prohlížeče. Totéž tlačítko je i v okně samotném a v chybovém hlášen�
 nepodařilo nastartovat. Data prohlížeče jdou do
 `%LOCALAPPDATA%\BattlegroundsTracker\webview2`, protože výchozí složka leží vedle `.exe`,
 kam nemusí být právo zápisu.
+
+### 11.3a Boční panel
+
+Vpravo od hlavní karty je sloupec o šířce 236 návrhových jednotek se třemi sekcemi:
+
+| sekce | co ukazuje | odkud |
+| --- | --- | --- |
+| BONUSY PRO CELOU HRU | tavern kouzla, blood gemy, elementálové, piráti po řádcích | entita hráče, viz 8.6b |
+| BONUSY NA KARTÁCH | karty na desce, které si samy zvyšují hodnotu | počítadla karty, viz 9.16 |
+| TRINKETY | malý a velký slot: jméno trinketu, nebo odpočet do výběru; po najetí myší popis efektu | entity slotů, viz 9.14 |
+| EKONOMIKA KRČMY | zlato, bonus toto kolo, utraceno v kole, cena rerollu, volné rerolly, cena upgradu, bonus příští kolo | tlačítka krčmy a entita hráče, viz 9.15 |
+
+Bonusy zlata jsou dva a v panelu stojí vždycky oba, i když jsou nulové: **bonus toto kolo** je
+zlato nad strop, které přišlo z karet zahraných minule (dočasné zlato), a **bonus příští kolo**
+přibývá z karet zahraných teď. Naměřeno na jednom zápase: v kole 13 stálo `4/11` s bonusem
+`+4` na příští kolo, v kole 14 pak `20/11` s bonusem `+9` v tomhle kole. Nulový bonus je
+tlumený, nenulový zelený, takže je na první pohled poznat, jestli bonus je, nebo není.
+
+Popis efektu trinketu se v tooltipu bere z databáze karet podle Card ID. To se získává ve dvou
+krocích, protože hra u druhého slotu kartu v entitě nevymění vůbec: nejdřív z entity slotu,
+a když v ní pořád leží prázdný slot, dohledá se podle jména mezi entitami s tagem
+`BACON_TRINKET`, tedy mezi nabídkami k výběru. Ty kartu nesou vždycky.
+
+Řádek je vždycky štítek vlevo a hodnota vpravo, takže se hodnoty všech sekcí zarovnají na
+jednu linku. Bonusy a trinkety začínají tlumené a rozsvítí se tím, že v dané hře nastanou;
+řádek tedy nikdy nepřibude ani nezmizí, jen změní barvu, a panel se pod rukou nehýbe. Volné
+rerolly a zlato navíc se naopak ukazují jen tehdy, když je hráč skutečně má, protože po většinu
+hry nejsou. Nula a neznámo se rozlišují: cena rerollu nula je `zdarma`, chybějící hodnota je
+pomlčka a na posledním tieru je místo ceny upgradu `max`.
+
+Panel se skrývá tlačítkem v hlavičce. Zmizí i jeho sloupec v mřížce, takže se karta zúží zpátky
+na 500 jednotek a okno na původní šířku; naměřeno 828 px s panelem a 563 px bez něj. Se
+schovaným panelem se bonusy vrátí na jeden řádek do karty lobby, aby o ně uživatel nepřišel —
+a naopak se s panelem ten řádek schová, aby tatáž informace nestála na dvou místech.
 
 ### 11.3b Proužek s hudbou
 
@@ -1211,9 +1346,26 @@ vracelo pod `dotnet test` verzi testhostu.
 Verze je vidět v patičce overlaye, v hlavičce konzolového dashboardu a přes
 `--version`.
 
-Verze se drží v `VersionPrefix` v `Directory.Build.props`. Ladicí build k ní dostane příponu
-přes `VersionSuffix`, takže hlásí `0.9.1-dev`, kdežto Release `0.9.1`. Vydává se jen Release, takže
-spuštěná binárka nikdy netvrdí verzi, kterou nikdo nevydal.
+Verze se drží v `VersionPrefix` v `Directory.Build.props`. Build, který neprošel vydáním, k ní
+dostane příponu přes `VersionSuffix`, takže hlásí `0.9.3-dev`, kdežto vydání `0.9.3`.
+
+**Podmínka je na `Version`, ne na `Configuration`.** Původně stálo
+`Condition="'$(Configuration)' == 'Debug'"`, což vypadá správně, ale `Directory.Build.props` se
+vyhodnocuje **před** tím, než SDK dosadí výchozí konfiguraci. Změřeno přes
+`dotnet msbuild -getProperty:VersionSuffix`: bez `-c` na příkazové řádce byl `Configuration`
+prázdný, podmínka neplatila a `dotnet build` bez parametru vyrobil binárku, která se tvářila
+jako vydaná verze. Zjistilo se to tak, že si takový build spustil uživatel a chybějící `-dev`
+mu neřeklo, že hraje se starším sestavením.
+
+`Version` naopak zadává jedině vydání (`-p:Version=…` v `release.yml`), takže se jako vydané
+nemůže označit nic, co vydáním neprošlo — ani Release build ze stroje. Naměřené chování:
+
+| build | verze |
+| --- | --- |
+| `dotnet build` | `0.9.3-dev` |
+| `dotnet build -c Debug` | `0.9.3-dev` |
+| `dotnet build -c Release` | `0.9.3-dev` |
+| `dotnet publish -c Release -p:Version=0.9.3` (vydání) | `0.9.3` |
 
 `TrackerVersion` proto nabízí tři věci: `Current` s příponou pro zobrazení, `Numeric` bez ní pro
 porovnání s vydáními na GitHubu (`Version.TryParse` by na `0.9.1-dev` selhalo) a `IsDevelopmentBuild`

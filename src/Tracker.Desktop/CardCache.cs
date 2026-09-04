@@ -21,6 +21,9 @@ public sealed class CardCache(CardArtProvider art, CardTextProvider texts)
     /// <summary>Sdílená instance pro celé okno; data se tak stahují jednou za běh aplikace.</summary>
     public static CardCache Shared { get; } = new(new CardArtProvider(), new CardTextProvider());
 
+    /// <summary>Databáze popisů, aby se do ní dalo nahlédnout i mimo <see cref="CardInfo" />.</summary>
+    public CardTextProvider Texts => texts;
+
     /// <summary>
     /// Vrátí držák dat pro danou kartu a při prvním dotazu spustí stahování. Vrací vždy stejnou
     /// instanci, aby porovnání modelů pohledu zůstalo stabilní.

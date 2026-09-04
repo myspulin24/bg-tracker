@@ -22,8 +22,11 @@ public partial class MainWindow : Window
         Replay
     }
 
-    /// <summary>Šířka, na kterou je rozložení navržené. Obsah se sází v ní a Viewbox ho škáluje.</summary>
-    private const double DesignWidth = 500;
+    /// <summary>Šířka hlavní karty. Obsah se sází v návrhových jednotkách a Viewbox ho škáluje.</summary>
+    private const double MainDesignWidth = 500;
+
+    /// <summary>Šířka sloupce s bočním panelem včetně odsazení od pravého okraje karty.</summary>
+    private const double SideDesignWidth = 236;
 
     /// <summary>Výška, na kterou je rozložení navržené, aby se žádný panel nemusel scrollovat.</summary>
     private const double ExpandedDesignHeight = 1163;
@@ -59,7 +62,7 @@ public partial class MainWindow : Window
     private PowerLogTailReader? liveReader;
     private MatchLogArchive? matchArchive;
     private int demoIndex;
-    private double expandedWidth = DesignWidth;
+    private double expandedWidth = MainDesignWidth + SideDesignWidth;
     private double expandedHeight = ExpandedDesignHeight;
     private double expandedMinHeight = 640;
     private bool isCollapsed;
@@ -147,12 +150,37 @@ public partial class MainWindow : Window
         ? ExpandedDesignHeight
         : CollapsedDesignHeight;
 
+    /// <summary>Návrhová šířka podle toho, jestli je vidět boční panel.</summary>
+    private double DesignWidth => MainDesignWidth +
+        (SidePanel.Visibility == Visibility.Visible ? SideDesignWidth : 0);
+
+    private void SidePanelButton_Click(object sender, RoutedEventArgs eventArgs) =>
+        SetSidePanelVisible(SidePanel.Visibility != Visibility.Visible);
+
+    /// <summary>
+    /// Ukáže nebo schová boční panel. Kromě panelu se musí zavřít i jeho sloupec v mřížce,
+    /// jinak by po skrytí zůstalo v kartě prázdné místo, a s ním se mění návrhová šířka, ze
+    /// které se počítá velikost okna.
+    /// </summary>
+    private void SetSidePanelVisible(bool visible)
+    {
+        SidePanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        SideColumn.Width = new GridLength(visible ? SideDesignWidth : 0);
+        SidePanelButton.Content = visible ? "◧" : "◨";
+        SidePanelButton.ToolTip = visible ? "Skrýt boční panel" : "Zobrazit boční panel";
+
+        // Se schovaným panelem se bonusy vrátí na řádek v kartě lobby, aby o ně uživatel nepřišel.
+        viewModel.IsSidePanelVisible = visible;
+        UpdateWindowHeight();
+    }
+
     /// <summary>
     /// Nasadí velikost rozbaleného okna: karta dostane návrhovou výšku a okno takovou, aby ji
     /// <c>Viewbox</c> vyplnil beze zbytku.
     /// </summary>
     private void ApplyExpandedSize()
     {
+        RootCard.Width = DesignWidth;
         RootCard.Height = DesignHeight;
         MinHeight = expandedMinHeight;
         Width = expandedWidth;
@@ -168,6 +196,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void ApplyCollapsedSize(double width)
     {
+        RootCard.Width = DesignWidth;
         RootCard.Height = HeaderDesignHeight;
 
         // Poměr stran drží hlavičku ve stejném zvětšení, jaké mělo rozbalené okno.

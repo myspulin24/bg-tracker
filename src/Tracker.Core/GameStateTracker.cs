@@ -5,6 +5,16 @@ namespace Tracker.Core;
 
 public sealed partial class GameStateTracker
 {
+    /// <summary>Tlačítko rerollu v krčmě; nese cenu i počet volných rerollů.</summary>
+    private const string RefreshButtonCardId = "TB_BaconShop_8p_Reroll_Button";
+
+    /// <summary>
+    /// Enchantment hráče, který drží nasčítaný útok undeadů: <c>Undead Bonus Attack Player
+    /// Enchant [DNT]</c>. Karta patří Nerubian Deathswarmerovi, ale jméno entity je obecné,
+    /// takže do ní hra sype bonus i z dalších karet se stejným efektem.
+    /// </summary>
+    private const string UndeadAttackEnchantmentCardId = "BG25_011pe";
+
     private static readonly HashSet<string> ParticipantTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "PLAYER_TECH_LEVEL", "HEALTH", "ARMOR", "DAMAGE", "PLAYSTATE",
@@ -315,7 +325,26 @@ public sealed partial class GameStateTracker
             case "COST" when TryInt(value, out var cost):
                 entity.Cost = cost;
                 RegisterTavernUpgradeCost(entity, cost);
+                return RegisterRefreshCost(entity, cost);
+            case "BACON_FREE_REFRESH_COUNT" when TryInt(value, out var freeRefreshes):
+                return RegisterFreeRefreshes(entity, freeRefreshes);
+            // Strop tavern tieru platí pro celou lobby a hra ho píše na entity hrdinů, takže
+            // se bere od kohokoli. Nula znamená, že ho hra ještě nenastavila.
+            case "BACON_MAX_PLAYER_TECH_LEVEL" when TryInt(value, out var maxTier) && maxTier > 0:
+                State.MaxTavernTier = maxTier;
                 return false;
+            case "BACON_TRINKET":
+                entity.IsTrinket |= value != "0";
+                return false;
+            case "TAG_SCRIPT_DATA_NUM_1" when TryInt(value, out var scriptNum1):
+                entity.ScriptDataNum1 = scriptNum1;
+                return RegisterUndeadBuff(entity, scriptNum1);
+            case "TAG_SCRIPT_DATA_NUM_2" when TryInt(value, out var scriptNum2):
+                entity.ScriptDataNum2 = scriptNum2;
+                return false;
+            case "BACON_TURNS_LEFT_TO_DISCOVER_TRINKET" when TryInt(value, out var turnsLeft):
+                entity.TrinketTurnsLeft = turnsLeft;
+                return entity.ControllerId == State.LocalControllerId;
             case "TECH_LEVEL" when TryInt(value, out var techLevel) && techLevel > 0:
                 entity.TechLevel = techLevel;
                 return true;
@@ -417,6 +446,11 @@ public sealed partial class GameStateTracker
                 return true;
             case "BACON_WON_LAST_COMBAT" when numeric != 0:
                 return RecordCombatWin();
+            // Zlato navíc na příští kolo. Nepatří k bonusům pro celou hru: ty se po souboji
+            // vracejí na starou hodnotu, kdežto tohle se po utracení skutečně vynuluje.
+            case "BACON_PLAYER_EXTRA_GOLD_NEXT_TURN":
+                State.ExtraGoldNextTurn = numeric > 0 ? numeric : null;
+                return true;
             case "DAMAGE_DEALT_TO_HERO_LAST_TURN":
                 return RecordCombatDamage(numeric);
             default:
@@ -907,6 +941,10 @@ public sealed partial class GameStateTracker
 
         entity.CardId = cardId;
         entity.IsHero |= IsHeroCard(cardId);
+
+        // Slot na trinket se označí kartou, se kterou entita vznikla. Po výběru trinketu se
+        // tatáž entita přepíše na vybranou kartu, takže později už by se slot nedal poznat.
+        entity.TrinketSlot ??= Trinket.SlotFromCardId(cardId);
         if (entity.Name is null && LookupCardName(cardId) is { } knownName)
         {
             NameEntity(entity, knownName);
@@ -1203,6 +1241,59 @@ public sealed partial class GameStateTracker
         tavernUpgradeCosts[tier] = cost;
         RefreshTavernUpgradeCost();
     }
+
+    /// <summary>
+    /// Nasčítaný útok undeadů. Tag <c>UNDEAD_ATTACK_BUFF</c> z enumu hry se v logu nevyskytuje;
+    /// hodnotu nese enchantment hráče <c>BG25_011pe</c> v <c>TAG_SCRIPT_DATA_NUM_1</c>. Každý
+    /// hráč má vlastní, proto se filtruje na controller lokálního hráče.
+    ///
+    /// Nula se zahazuje ze stejného důvodu jako u ostatních bonusů: enchantment se každým
+    /// soubojem přegeneruje a ten odcházející dostane nulu, ačkoli bonus platí dál.
+    /// </summary>
+    private bool RegisterUndeadBuff(TrackedEntity entity, int value)
+    {
+        if (entity.ControllerId != State.LocalControllerId ||
+            !string.Equals(entity.CardId, UndeadAttackEnchantmentCardId, StringComparison.OrdinalIgnoreCase) ||
+            value == State.Buffs.UndeadAttack ||
+            (value == 0 && State.Buffs.UndeadAttack > 0))
+        {
+            return false;
+        }
+
+        State.Buffs.UndeadAttack = value;
+        return true;
+    }
+
+    /// <summary>
+    /// Cena rerollu a počet volných rerollů se čtou z tlačítka
+    /// <c>TB_BaconShop_8p_Reroll_Button</c> lokálního hráče. Volné rerolly hra píše i na
+    /// pomocnou enchantment entitu, ale jen tlačítko drží stav, který uživatel opravdu vidí.
+    /// </summary>
+    private bool RegisterRefreshCost(TrackedEntity entity, int cost)
+    {
+        if (!IsLocalRefreshButton(entity))
+        {
+            return false;
+        }
+
+        State.RefreshCost = cost;
+        return true;
+    }
+
+    private bool RegisterFreeRefreshes(TrackedEntity entity, int count)
+    {
+        if (!IsLocalRefreshButton(entity))
+        {
+            return false;
+        }
+
+        State.FreeRefreshes = count > 0 ? count : null;
+        return true;
+    }
+
+    private bool IsLocalRefreshButton(TrackedEntity entity) =>
+        entity.ControllerId == State.LocalControllerId &&
+        string.Equals(entity.CardId, RefreshButtonCardId, StringComparison.OrdinalIgnoreCase);
 
     private void RefreshTavernUpgradeCost()
     {

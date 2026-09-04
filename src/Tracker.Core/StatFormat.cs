@@ -36,4 +36,16 @@ public static class StatFormat
     /// <summary>Totéž pro hodnotu, která nemusí být známá.</summary>
     public static string Compact(int? value, string unknown = "—") =>
         value is { } known ? Compact(known) : unknown;
+
+    /// <summary>
+    /// Odpočet kol v českých tvarech: <c>za 1 kolo</c>, <c>za 3 kola</c>, <c>za 5 kol</c>.
+    /// Nula i záporná hodnota znamená, že výběr přijde hned v tomhle kole.
+    /// </summary>
+    public static string TurnsLeft(int turns) => turns switch
+    {
+        <= 0 => "už tohle kolo",
+        1 => "za 1 kolo",
+        2 or 3 or 4 => $"za {turns} kola",
+        _ => $"za {turns} kol",
+    };
 }

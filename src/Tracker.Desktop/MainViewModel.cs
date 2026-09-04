@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
@@ -34,10 +35,42 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string loadStatus = string.Empty;
     private string sourceTooltip = string.Empty;
 
+    /// <summary>Bonus, který v této hře ještě nenastal.</summary>
+    private const string EmptyBonus = "+0/+0";
+
     /// <summary>Glyfy z fontu Segoe MDL2 Assets: pauza a přehrát.</summary>
     private const string PauseGlyph = "\uE769";
     private const string PlayGlyph = "\uE768";
 
+    private string spellBuff = EmptyBonus;
+    private bool hasSpellBuff;
+    private string bloodGemBuff = EmptyBonus;
+    private bool hasBloodGemBuff;
+    private string elementalBuff = EmptyBonus;
+    private bool hasElementalBuff;
+    private string pirateBuff = EmptyBonus;
+    private bool hasPirateBuff;
+    private string undeadBuff = "+0";
+    private bool hasUndeadBuff;
+    private string lesserTrinket = "—";
+    private bool hasLesserTrinket;
+    private string greaterTrinket = "—";
+    private bool hasGreaterTrinket;
+    private string goldDetail = "—";
+    private string goldSpent = "—";
+    private string refreshCost = "—";
+    private string freeRefreshes = string.Empty;
+    private bool hasFreeRefreshes;
+    private string upgradeCost = "—";
+    private string extraGold = string.Empty;
+    private bool hasExtraGold;
+    private string tempGold = string.Empty;
+    private bool hasTempGold;
+    private bool hasCardCounters;
+    private CardInfo? lesserTrinketCard;
+    private CardInfo? greaterTrinketCard;
+    private bool isSidePanelVisible = true;
+    private bool hasInlineBuffs;
     private string mediaTitle = string.Empty;
     private string mediaSubtitle = string.Empty;
     private ImageSource? mediaArt;
@@ -132,6 +165,95 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public bool CanMediaPrevious { get => canMediaPrevious; private set => Set(ref canMediaPrevious, value); }
 
+    /// <summary>
+    /// Bonusy pro celou hru rozpadlé po řádcích do bočního panelu. Řádek se ukazuje vždy;
+    /// dokud bonus nenastane, je zeslabený, aby panel při prvním kouzlu neposkočil.
+    /// </summary>
+    public string SpellBuff { get => spellBuff; private set => Set(ref spellBuff, value); }
+
+    public bool HasSpellBuff { get => hasSpellBuff; private set => Set(ref hasSpellBuff, value); }
+    public string BloodGemBuff { get => bloodGemBuff; private set => Set(ref bloodGemBuff, value); }
+    public bool HasBloodGemBuff { get => hasBloodGemBuff; private set => Set(ref hasBloodGemBuff, value); }
+    public string ElementalBuff { get => elementalBuff; private set => Set(ref elementalBuff, value); }
+    public bool HasElementalBuff { get => hasElementalBuff; private set => Set(ref hasElementalBuff, value); }
+    public string PirateBuff { get => pirateBuff; private set => Set(ref pirateBuff, value); }
+    public bool HasPirateBuff { get => hasPirateBuff; private set => Set(ref hasPirateBuff, value); }
+
+    /// <summary>Útok undeadů. Život se u nich takhle nebuffuje, proto je hodnota jen jedna.</summary>
+    public string UndeadBuff { get => undeadBuff; private set => Set(ref undeadBuff, value); }
+
+    public bool HasUndeadBuff { get => hasUndeadBuff; private set => Set(ref hasUndeadBuff, value); }
+
+    /// <summary>
+    /// Karty na desce, které si samy zvyšují hodnotu. Nejsou to bonusy pro celou hru: hra je
+    /// drží na kartě, ne na entitě hráče (viz <see cref="CardCounter" />).
+    /// </summary>
+    public ObservableCollection<CardCounter> CardCounters { get; } = [];
+
+    public bool HasCardCounters { get => hasCardCounters; private set => Set(ref hasCardCounters, value); }
+
+    /// <summary>Karta malého trinketu; z ní se v tooltipu bere popis efektu.</summary>
+    public CardInfo? LesserTrinketCard { get => lesserTrinketCard; private set => Set(ref lesserTrinketCard, value); }
+
+    public CardInfo? GreaterTrinketCard { get => greaterTrinketCard; private set => Set(ref greaterTrinketCard, value); }
+
+    /// <summary>Jméno vybraného trinketu, nebo odpočet do výběru.</summary>
+    public string LesserTrinket { get => lesserTrinket; private set => Set(ref lesserTrinket, value); }
+
+    /// <summary>Je malý trinket už vybraný? Prázdný slot se vypisuje zeslabeně.</summary>
+    public bool HasLesserTrinket { get => hasLesserTrinket; private set => Set(ref hasLesserTrinket, value); }
+
+    public string GreaterTrinket { get => greaterTrinket; private set => Set(ref greaterTrinket, value); }
+    public bool HasGreaterTrinket { get => hasGreaterTrinket; private set => Set(ref hasGreaterTrinket, value); }
+
+    /// <summary>Zlato k utracení a strop kola, tedy <c>4/7</c>.</summary>
+    public string GoldDetail { get => goldDetail; private set => Set(ref goldDetail, value); }
+
+    /// <summary>Kolik zlata už v tomhle kole padlo.</summary>
+    public string GoldSpent { get => goldSpent; private set => Set(ref goldSpent, value); }
+
+    /// <summary>
+    /// Zlato nad strop kola, které přinesly efekty. Vysvětluje, proč je k utracení víc, než
+    /// kolik kolo dává.
+    /// </summary>
+    public string TempGold { get => tempGold; private set => Set(ref tempGold, value); }
+
+    public bool HasTempGold { get => hasTempGold; private set => Set(ref hasTempGold, value); }
+
+    /// <summary>Cena rerollu; nula se vypisuje jako „zdarma“.</summary>
+    public string RefreshCost { get => refreshCost; private set => Set(ref refreshCost, value); }
+
+    /// <summary>Kolik rerollů zbývá zdarma, například <c>2×</c>.</summary>
+    public string FreeRefreshes { get => freeRefreshes; private set => Set(ref freeRefreshes, value); }
+
+    /// <summary>Má hráč volné rerolly? Řádek se jinak neukazuje.</summary>
+    public bool HasFreeRefreshes { get => hasFreeRefreshes; private set => Set(ref hasFreeRefreshes, value); }
+
+    public string UpgradeCost { get => upgradeCost; private set => Set(ref upgradeCost, value); }
+
+    /// <summary>Zlato navíc na příští kolo, například <c>+2</c>.</summary>
+    public string ExtraGold { get => extraGold; private set => Set(ref extraGold, value); }
+
+    /// <summary>Dostane hráč příští kolo zlato navíc? Řádek se jinak neukazuje.</summary>
+    public bool HasExtraGold { get => hasExtraGold; private set => Set(ref hasExtraGold, value); }
+
+    /// <summary>
+    /// Je vidět boční panel? Když ano, řádek s bonusy v kartě lobby se schová, aby tatáž
+    /// informace nestála na dvou místech.
+    /// </summary>
+    public bool IsSidePanelVisible
+    {
+        get => isSidePanelVisible;
+        set
+        {
+            Set(ref isSidePanelVisible, value);
+            HasInlineBuffs = hasBuffs && !value;
+        }
+    }
+
+    /// <summary>Řádek s bonusy uvnitř karty lobby; jen když je boční panel schovaný.</summary>
+    public bool HasInlineBuffs { get => hasInlineBuffs; private set => Set(ref hasInlineBuffs, value); }
+
     /// <summary>Přenese do rozhraní, co hlásí systémové rozhraní pro média.</summary>
     public void ApplyMedia(NowPlaying playing, ImageSource? art)
     {
@@ -162,6 +284,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             : "Typy: " + string.Join(" · ", state.AvailableRaces.Select(MinionRace.Display));
         Buffs = BuffSummary(state.Buffs);
         HasBuffs = Buffs.Length > 0;
+        ApplySidePanel(state);
         OpposingBoardTitle = state.IsCombatPhase ? "DESKA SOUPEŘE" : "NABÍDKA BOBA";
         GameMode = state.IsDuos ? "DUOS" : "SÓLO";
         Result = state.FinalPlace is { } finalPlace
@@ -358,9 +481,127 @@ public sealed class MainViewModel : INotifyPropertyChanged
             parts.Add($"piráti {Bonus(buffs.PirateAttack, buffs.PirateHealth)}");
         }
 
-        return "Bonusy: " + string.Join(" · ", parts);
+        if (buffs.HasUndead)
+        {
+            parts.Add($"undead +{buffs.UndeadAttack} útoku");
+        }
 
-        static string Bonus(int attack, int health) => $"+{attack}/+{health}";
+        return "Bonusy: " + string.Join(" · ", parts);
+    }
+
+    private static string Bonus(int attack, int health) => $"+{attack}/+{health}";
+
+    /// <summary>
+    /// Boční panel: bonusy pro celou hru po řádcích, oba sloty na trinkety s odpočtem
+    /// a ekonomika krčmy. Hodnoty, které log nezná, zůstávají pomlčkou, ať je poznat rozdíl
+    /// mezi nulou a neznámem.
+    /// </summary>
+    private void ApplySidePanel(TrackerState state)
+    {
+        var buffs = state.Buffs;
+        SpellBuff = Bonus(buffs.SpellAttack, buffs.SpellHealth);
+        HasSpellBuff = buffs.HasSpell;
+        BloodGemBuff = Bonus(buffs.BloodGemAttack, buffs.BloodGemHealth);
+        HasBloodGemBuff = buffs.HasBloodGem;
+        ElementalBuff = Bonus(buffs.ElementalAttack, buffs.ElementalHealth);
+        HasElementalBuff = buffs.HasElemental;
+        PirateBuff = Bonus(buffs.PirateAttack, buffs.PirateHealth);
+        HasPirateBuff = buffs.HasPirate;
+        UndeadBuff = $"+{buffs.UndeadAttack}";
+        HasUndeadBuff = buffs.HasUndead;
+
+        LesserTrinket = TrinketLabel(state.LesserTrinket);
+        HasLesserTrinket = state.LesserTrinket is { IsFilled: true };
+        LesserTrinketCard = CardCache.Shared.Get(state.LesserTrinket?.CardId);
+        GreaterTrinket = TrinketLabel(state.GreaterTrinket);
+        HasGreaterTrinket = state.GreaterTrinket is { IsFilled: true };
+        GreaterTrinketCard = CardCache.Shared.Get(state.GreaterTrinket?.CardId);
+
+        Sync(CardCounters, Counters(state));
+        HasCardCounters = CardCounters.Count > 0;
+
+        GoldDetail = state.AvailableGold is { } available
+            ? $"{available}/{state.Gold ?? available}"
+            : "—";
+        GoldSpent = Value(state.GoldSpent);
+
+        // Oba bonusy se ukazují pořád, i když jsou nulové: hráč potřebuje vědět nejen že bonus
+        // má, ale i že žádný nemá. Bonus tohohle kola přišel jako dočasné zlato z karet
+        // zahraných minule, bonus na příští kolo přibývá z karet zahraných teď.
+        HasTempGold = state.TempGold is > 0;
+        TempGold = $"+{state.TempGold ?? 0}";
+        HasExtraGold = state.ExtraGoldNextTurn is > 0;
+        ExtraGold = $"+{state.ExtraGoldNextTurn ?? 0}";
+        RefreshCost = state.RefreshCost switch
+        {
+            0 => "zdarma",
+            { } cost => cost.ToString(CultureInfo.InvariantCulture),
+            null => "—",
+        };
+        HasFreeRefreshes = state.FreeRefreshes is > 0;
+        FreeRefreshes = state.FreeRefreshes is { } free ? $"{free}×" : string.Empty;
+        UpgradeCost = UpgradeLabel(state);
+        HasInlineBuffs = HasBuffs && !IsSidePanelVisible;
+    }
+
+    /// <summary>
+    /// Karty na desce, které si samy zvyšují hodnotu. Poznají se podle textu: „improve this“ je
+    /// formulace, kterou hra u těchto karet používá, a jen u nich se aktuální hodnota
+    /// z počítadla liší od čísel v textu. Ostatní karty počítadla používají k vnitřní evidenci,
+    /// takže by z nich v panelu byla jen nesrozumitelná čísla.
+    /// </summary>
+    private static IReadOnlyList<CardCounter> Counters(TrackerState state) =>
+    [
+        .. state.PlayerBoard
+            .Where(minion => minion.ScriptDataNum1 is > 0 && Improves(minion.CardId))
+            .Select(minion => new CardCounter(
+                minion.Name,
+                Counter(minion),
+                CardCache.Shared.Get(minion.CardId)))
+    ];
+
+    /// <summary>
+    /// Čte se z už načtené tabulky popisů, ne z <see cref="CardInfo" />: ten se doplňuje
+    /// asynchronně, takže v tomtéž okamžiku, kdy karta na desce přibude, je jeho popis ještě
+    /// prázdný a sekce by se objevila až o jeden přepočet později.
+    /// </summary>
+    private static bool Improves(string? cardId) =>
+        cardId is not null &&
+        CardCache.Shared.Texts.Loaded.TryGetValue(cardId, out var text) &&
+        text.Contains("improve this", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Hodnota, kterou karta právě dává. Z obou počítadel se bere to vyšší, protože jedno drží
+    /// nasčítaný přírůstek a druhé už výsledek: naměřeno na Spark Snapperovi, kde při
+    /// <c>NUM_1</c> = 26 a <c>NUM_2</c> = 28 dostal minion na desce +28/+28. Vypisovat obojí
+    /// jako <c>26/28</c> by tvrdilo, že je satelit nesouměrný, což není.
+    /// </summary>
+    private static string Counter(BoardMinion minion) =>
+        Math.Max(minion.ScriptDataNum1 ?? 0, minion.ScriptDataNum2 ?? 0)
+            .ToString(CultureInfo.InvariantCulture);
+
+    private static string TrinketLabel(Trinket? trinket) => trinket switch
+    {
+        { IsFilled: true, Name: { } name } => name,
+        // Nula neznamená „za nula kol“, ale že nabídka je na stole a čeká na výběr.
+        { TurnsLeft: <= 0 } => "čeká výběr",
+        { TurnsLeft: { } turns } => StatFormat.TurnsLeft(turns),
+        _ => "—",
+    };
+
+    /// <summary>
+    /// Cena upgradu tavernu. Na posledním tieru už ji hra neposílá, takže se místo pomlčky,
+    /// která znamená „nevím“, vypíše <c>max</c>.
+    /// </summary>
+    private static string UpgradeLabel(TrackerState state)
+    {
+        if (state.TavernUpgradeCost is { } cost)
+        {
+            return cost.ToString(CultureInfo.InvariantCulture);
+        }
+
+        var tier = state.LocalParticipant?.TavernTier;
+        return tier is { } current && state.MaxTavernTier is { } max && current >= max ? "max" : "—";
     }
 
     private static string FirstUpper(string value) => string.IsNullOrEmpty(value)
