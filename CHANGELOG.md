@@ -10,7 +10,15 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
-## [0.10.0] - 2026-09-04
+## [0.10.1] - 2026-09-04
+
+### Opraveno
+
+- Log předaný na příkazové řádce (`--log`) se přehraje, místo aby se z něj stal živý zápas.
+  Dřív se takový log založil do archivu jako právě odehraná hra a přepsal checkpoint; protože
+  se archiv drží na pěti posledních zápasech, opakované spuštění vytlačilo skutečně odehrané
+  hry. Cesta k logu běžící hry se pořád čte živě, takže ruční výběr aktuálního logu funguje
+  jako dřív.
 
 ### Přidáno
 
@@ -293,7 +301,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.10.0...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/myspulin24/bg-tracker/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/myspulin24/bg-tracker/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/myspulin24/bg-tracker/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/myspulin24/bg-tracker/compare/v0.9.1...v0.9.2

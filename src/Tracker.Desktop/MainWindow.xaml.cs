@@ -353,7 +353,18 @@ public partial class MainWindow : Window
         var commandLineLog = ParseLogArgument(Environment.GetCommandLineArgs());
         if (commandLineLog is not null && PowerLogDiscovery.Find(commandLineLog) is { } explicitLog)
         {
-            await StartLiveAsync(explicitLog, autoDiscovered: false);
+            // Log z příkazové řádky se jen přehraje, pokud nepatří běžící hře. Jako živý zdroj
+            // by z něj vznikla další kopie v archivu zápasů a přepsal by checkpoint — a protože
+            // se archiv drží na pěti zápasech, vytlačily by tyhle kopie skutečně odehrané hry.
+            // Ukázat cestu k logu běžící hry je naopak legitimní, tam se živé čtení zachová.
+            if (IsCurrentSessionLog(explicitLog))
+            {
+                await StartLiveAsync(explicitLog, autoDiscovered: false);
+            }
+            else
+            {
+                await StartReplayAsync(explicitLog);
+            }
         }
         else
         {

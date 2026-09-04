@@ -9,7 +9,7 @@
   <!-- Jediné místo, kde se verze a autorství udržují. Odsud je dědí AssemblyVersion,
        FileVersion i InformationalVersion, takže sedí v UI i ve vlastnostech souboru .exe. -->
   <PropertyGroup>
-    <VersionPrefix>0.10.0</VersionPrefix>
+    <VersionPrefix>0.10.1</VersionPrefix>
     <Product>Battlegrounds Tracker</Product>
     <Authors>Michal Jašek</Authors>
     <Company>Michal Jašek</Company>
