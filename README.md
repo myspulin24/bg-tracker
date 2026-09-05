@@ -75,6 +75,9 @@ Pilot umí:
 - ukázat vlastní desku, desku aktuálního soupeře, nabídku Boba a karty v ruce
   se statistikami, tierem, zlatou verzí a klíčovými slovy;
 - po najetí myší na hráče ukázat jeho poslední známou desku i s číslem kola;
+- v Duos seskupit lobby po dvojicích se sdílenými životy, ukázat desku spoluhráče i obou
+  soupeřů ze souboje, kdo z dvojice bojuje první, nápovědu páru či triplu pro spoluhráče
+  u karet v nabídce a ohlásit kartu předanou spoluhráči;
 - vypsat typy minionů, které se v lobby objevily v nabídce Boba;
 - otevřít patch notes Hearthstonu ve vestavěném prohlížeči, v okně nad hrou;
 - držet počítadlo bonusů platných pro celou hru: o kolik víc dávají tavern kouzla

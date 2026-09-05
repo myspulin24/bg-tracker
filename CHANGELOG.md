@@ -10,6 +10,55 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.11.0] - 2026-09-05
+
+Revize režimu Duos nad pěti skutečnými zápasy. Sólo se mění jen v umístění vyřazených hráčů.
+
+### Opraveno
+
+- **Poškození v Duos bylo dvojnásobné.** Když lokální hráč bojoval první a tým prohrál, zapíše
+  hra `DAMAGE_DEALT_TO_HERO_LAST_TURN` dvakrát: za soubojovou kopii spoluhráče a znovu za
+  vlastního hrdinu, takže druhá hodnota je dvojnásobek (4→8, 12→24, 15→30). Tracker bral tu
+  druhou; skutečný úbytek životů odpovídal ve všech měřených zápasech té první, a ta se teď
+  bere. V sólu se nic nemění.
+- **Deska spoluhráče se ukládala pod lokálního hráče.** Když spoluhráč bojoval první, stála
+  na lokální straně desky jeho sestava a tracker ji zapsal jako vlastní. Desky se teď ukládají
+  pod hrdinu, který s nimi doopravdy bojoval; pro každou stranu se sleduje, kdo na ní stojí.
+- **Tým se hlásil jako vyřazený dvakrát a s předčasnou hláškou.** Dvojice sdílí životy a hra
+  píše stejné hodnoty na oba hrdiny, jen s odstupem; mezi tím tracker hlásil `X vypadl, tým
+  hraje dál.` a potom ještě celý tým. Životy se teď mezi spoluhráči zrcadlí a tým padá naráz.
+- **Umístění vyřazeného hráče bylo živé pořadí, ne konečné místo.** Tag umístění v okamžiku
+  vyřazení nese ještě pořadí z doby, kdy hráč žil; hráč vyřazený jako pátý se hlásil na
+  druhém místě a tým vyřazený jako druhý na prvním. Umístění se počítá z počtu těch, kdo
+  zůstali ve hře, a dva pády v jednom kole řadí zbývající životy. Platí pro sólo i Duos.
+- Hláška o souboji v Duos jmenovala jen prvního soupeře. Souboj je týmový: druhý z dvojice se
+  přidá, jakmile padne některá deska, a v logu se na soupeřově straně vystřídají oba. Hláška
+  teď zní `Kolo 3 · tým vs Overlord Saurfang + Snake Eyes: prohra, dostali jsme 4 dmg.`
+
+### Přidáno
+
+- Desky **obou soupeřů i spoluhráče** ze souboje. Podokno u řádku spoluhráče ukazuje jeho
+  poslední desku s číslem kola, stejně jako u soupeřů; do jeho prvního souboje řekne, že ji
+  uvidíte po něm.
+- Nadpis vlastní desky během souboje říká, čí deska na lokální straně právě stojí:
+  `DESKA SPOLUHRÁČE · Drek'Thar`. Nadpis soupeřovy desky nese jméno hrdiny, který na ní právě
+  je, protože se během jednoho souboje vystřídají oba.
+- Řádek s dalším soupeřem v Duos jmenuje oba hrdiny dvojice v pořadí, v jakém nastoupí, a říká,
+  kdo začíná za náš tým: `Další soupeři: Overlord Saurfang + Snake Eyes · první bojuje
+  spoluhráč` (tag `BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT`).
+- Nápověda **pár pro spoluhráče** a **triple pro spoluhráče** u minionů v nabídce Boba, tak jak
+  to hra značí ikonou na kartě (tagy `BACON_DUO_PAIR_CANDIDATE_TEAMMATE`
+  a `BACON_DUO_TRIPLE_CANDIDATE_TEAMMATE`).
+- Hláška o kartě předané spoluhráči: `Předal jsem spoluhráči: Proud Privateer.` (tag
+  `IS_USING_PASS_OPTION`).
+
+### Změněno
+
+- Řazení týmů v žebříčku bere vyšší z obou hodnot zbývajících životů dvojice, ne součet, který
+  sdílené životy počítal dvakrát. Na pořadí to nic nemění.
+- V hláškách o souboji se v Duos píše `dostali jsme` a `dali jsme`; poškození dostává a dává
+  tým.
+
 ## [0.10.1] - 2026-09-04
 
 ### Opraveno
@@ -301,7 +350,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.10.1...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/myspulin24/bg-tracker/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/myspulin24/bg-tracker/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/myspulin24/bg-tracker/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/myspulin24/bg-tracker/compare/v0.9.2...v0.9.3

@@ -39,7 +39,7 @@ internal static class ConsoleDashboard
         builder.AppendLine();
 
         AppendLobby(builder, state);
-        AppendBoard(builder, "MOJE DESKA", state.PlayerBoard);
+        AppendBoard(builder, state.IsTeammateFighting ? "DESKA SPOLUHRÁČE" : "MOJE DESKA", state.PlayerBoard);
         AppendBoard(builder, state.IsCombatPhase ? "DESKA SOUPEŘE" : "NABÍDKA BOBA",
             state.IsCombatPhase ? state.OpponentBoard : state.Shop);
         AppendBoard(builder, "RUKA", state.Hand);
@@ -141,7 +141,8 @@ internal static class ConsoleDashboard
         {
             var gold = minion.IsGolden ? "★ " : "  ";
             var tier = minion.TechLevel is { } level ? $"T{level}" : "  ";
-            var keywords = minion.Keywords.Length > 0 ? $"  [{minion.Keywords}]" : string.Empty;
+            var extras = string.Join(" · ", new[] { minion.Keywords, minion.TeammateHint }.Where(part => part.Length > 0));
+            var keywords = extras.Length > 0 ? $"  [{extras}]" : string.Empty;
             builder.AppendLine($"  {minion.ZonePosition}. {gold}{Truncate(minion.Name, 30).PadRight(30)} {minion.Stats,-8} {tier}{keywords}");
         }
 
@@ -185,6 +186,12 @@ internal static class ConsoleDashboard
             var round = combat.Round?.ToString() ?? "—";
             var opponent = combat.OpponentBattleTag ?? combat.OpponentHeroName ??
                            (combat.OpponentPlayerId is { } slot ? $"hráč #{slot}" : "—");
+            // V Duos se bojuje proti celé dvojici.
+            if (state.IsDuos && (combat.OpponentTeammateBattleTag ?? combat.OpponentTeammateHeroName) is { } mate)
+            {
+                opponent = $"{opponent} + {mate}";
+            }
+
             var damage = combat.DamageTaken is > 0 ? $" −{combat.DamageTaken} HP" : string.Empty;
             builder.AppendLine($"  Kolo {round,-3} {Truncate(opponent, 24).PadRight(24)} {TranslateResult(combat.Outcome)}{damage}");
         }
@@ -200,12 +207,28 @@ internal static class ConsoleDashboard
         ? $"{available}/{state.Gold ?? available}"
         : "—";
 
+    /// <summary>
+    /// V Duos se bojuje proti celé dvojici: první nastupuje hrdina z <c>NEXT_OPPONENT_PLAYER_ID</c>,
+    /// druhý se přidá, až padne některá z desek. Kdo začíná za náš tým, říká tag na entitě hráče.
+    /// </summary>
     private static string OpponentLabel(TrackerState state)
     {
         var first = SlotLabel(state.NextOpponent, state.NextOpponentPlayerId);
-        return state.IsDuos && (state.NextOpponentTeammate is not null || state.NextOpponentTeammatePlayerId is not null)
-            ? $"{first} — v týmu s {SlotLabel(state.NextOpponentTeammate, state.NextOpponentTeammatePlayerId)}"
-            : first;
+        if (!state.IsDuos)
+        {
+            return first;
+        }
+
+        var second = state.NextOpponentTeammatePlayerId is null
+            ? string.Empty
+            : $" + {SlotLabel(state.NextOpponentTeammate, state.NextOpponentTeammatePlayerId)}";
+        var starter = state.LocalFightsFirst switch
+        {
+            true => " · první bojuji já",
+            false => " · první bojuje spoluhráč",
+            null => string.Empty
+        };
+        return $"{first}{second}{starter}";
     }
 
     private static string SlotLabel(LobbyParticipant? participant, int? playerId) => participant is not null

@@ -32,15 +32,56 @@ public sealed partial class GameStateTracker
     private readonly Dictionary<int, int> tavernUpgradeCosts = [];
     private readonly Dictionary<string, string> cardNames = new(StringComparer.Ordinal);
     private readonly Dictionary<int, int> leaderboardHeroes = [];
-    private readonly HashSet<int> eliminatedSlots = [];
+
+    /// <summary>
+    /// Ohlášená vyřazení. Klíčem je slot; v Duos, kde padá celý tým, záporné číslo týmu. Hláška
+    /// se pamatuje proto, aby se dala přepsat, až log dodá skutečné umístění.
+    /// </summary>
+    private readonly Dictionary<int, EliminationNote> eliminations = [];
+
+    /// <summary>Sloty, jejichž deska už se v tomto souboji uložila; brání přepsání zbytky desky.</summary>
+    private readonly HashSet<int> capturedSlotsThisCombat = [];
+
     private CombatRound? announcedCombat;
     private string? announcedCombatMessage;
     private int? localTeamId;
     private int? localPlayerId;
     private int? localPlayerEntityId;
     private int? announcedRound;
-    private bool combatBoardsCaptured;
     private bool announcedGameOver;
+
+    /// <summary>
+    /// Hrdina, který právě stojí na které straně desky, podle <c>HERO_ENTITY</c> obou entit
+    /// hráčů. V sólu se na lokální straně nikdy nemění; v Duos hra během souboje přepíná obě
+    /// strany mezi oběma hrdiny dvojice, jak se přidávají do boje.
+    /// </summary>
+    private int? localSideHeroId;
+
+    private int? opponentSideHeroId;
+
+    /// <summary>Čeká deska na dané straně na uložení? Nastavuje se se vstupem hrdiny do souboje.</summary>
+    private bool localCapturePending;
+
+    private bool opponentCapturePending;
+
+    /// <summary>Vystřídal se na straně během tohoto souboje hrdina? Pak už se deska na konci neukládá.</summary>
+    private bool localSideSwitched;
+
+    private bool opponentSideSwitched;
+
+    /// <summary>
+    /// Ohlášené vyřazení: hláška, hodnota tagu umístění v okamžiku ohlášení, kolo a umístění
+    /// v hlášce. <paramref name="Computed"/> říká, že umístění vyšlo z počtu zbývajících hráčů,
+    /// ne z tagu.
+    /// </summary>
+    private sealed record EliminationNote(
+        string Message,
+        int? TagPlace,
+        int? Round,
+        int? Place,
+        bool Computed,
+        LobbyParticipant Participant,
+        IReadOnlyList<LobbyParticipant> Team);
 
     public TrackerState State { get; } = new();
 
@@ -204,9 +245,10 @@ public sealed partial class GameStateTracker
         }
 
         // První útok znamená, že jsou obě desky postavené a ještě nikdo neumřel. Je to jediný
-        // okamžik, kdy se dá zachytit soupeřova deska tak, jak do souboje nastoupil.
+        // okamžik, kdy se dá zachytit soupeřova deska tak, jak do souboje nastoupil. V Duos se
+        // to opakuje pro každého hrdinu, který se do souboje přidá.
         if (tag.Equals("PROPOSED_ATTACKER", StringComparison.OrdinalIgnoreCase) &&
-            State.IsCombatPhase && !combatBoardsCaptured)
+            State.IsCombatPhase && (localCapturePending || opponentCapturePending))
         {
             CaptureCombatBoards();
             return true;
@@ -224,7 +266,9 @@ public sealed partial class GameStateTracker
 
         if (tag.Equals("HERO_ENTITY", StringComparison.OrdinalIgnoreCase))
         {
-            return BindHeroOwner(entity, value) || changed;
+            var bound = BindHeroOwner(entity, value);
+            var sideChanged = TrackSideHero(entity, value);
+            return bound || sideChanged || changed;
         }
 
         if (!ParticipantTags.Contains(tag) || IsGameEntity(entity))
@@ -294,6 +338,7 @@ public sealed partial class GameStateTracker
                 return TryRegisterOfferedRace(entity);
             case "PLAYER_ID" when entity.IsHero && TryInt(value, out var lobbyPlayerId):
                 entity.LobbyPlayerId = lobbyPlayerId;
+                RefreshCombatSlots(entity);
                 return true;
             case "BACON_DUO_TEAM_ID" when TryInt(value, out var teamId) && teamId > 0:
                 entity.DuoTeamId = teamId;
@@ -395,9 +440,43 @@ public sealed partial class GameStateTracker
                 State.NextOpponentTeammatePlayerId = opponentMate > 0 ? opponentMate : null;
                 State.IsDuos = true;
                 return true;
+            // Kdo z dvojice bojuje v příštím souboji první. Hra to na konci souboje napíše na
+            // všechny hrdiny lobby; na entitu hráče ho zvlášť čte ApplyLocalPlayerTag.
+            case "BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT":
+                entity.FightsFirstNextCombat = value != "0";
+                State.IsDuos = true;
+                return false;
+            // Ikona na kartě v nabídce nebo v ruce: tahle karta by spoluhráči složila pár či triple.
+            case "BACON_DUO_PAIR_CANDIDATE_TEAMMATE":
+                entity.IsTeammatePairCandidate = value != "0";
+                State.IsDuos = true;
+                return true;
+            case "BACON_DUO_TRIPLE_CANDIDATE_TEAMMATE":
+                entity.IsTeammateTripleCandidate = value != "0";
+                State.IsDuos = true;
+                return true;
+            case "IS_USING_PASS_OPTION" when value != "0":
+                return AnnouncePass(entity);
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Předání karty spoluhráči. Hra ho v logu značí tagem <c>IS_USING_PASS_OPTION</c> na kartě
+    /// v ruce; karta pak odejde do <c>SETASIDE</c> a u spoluhráče vznikne kopie, kterou už log
+    /// neukáže. Opačný směr, tedy karta od spoluhráče, v logu žádnou vlastní stopu nemá.
+    /// </summary>
+    private bool AnnouncePass(TrackedEntity entity)
+    {
+        if (entity.Name is not { } name)
+        {
+            return false;
+        }
+
+        State.IsDuos = true;
+        State.AddEvent($"Předal jsem spoluhráči: {name}.");
+        return true;
     }
 
     /// <summary>Tagy, které hra publikuje na entitě lokálního hráče: zlato a výsledek posledního souboje.</summary>
@@ -442,6 +521,10 @@ public sealed partial class GameStateTracker
                 return true;
             case "NEXT_OPPONENT_TEAMMATE_PLAYER_ID":
                 State.NextOpponentTeammatePlayerId = numeric > 0 ? numeric : null;
+                State.IsDuos = true;
+                return true;
+            case "BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT":
+                State.LocalFightsFirst = numeric != 0;
                 State.IsDuos = true;
                 return true;
             case "BACON_WON_LAST_COMBAT" when numeric != 0:
@@ -544,9 +627,9 @@ public sealed partial class GameStateTracker
     }
 
     /// <summary>
-    /// Ohlásí souboj, nebo předchozí hlášku o témže souboji přepíše. V Duos dorazí výsledek
-    /// i poškození po částech, jak dobojuje každý ze spoluhráčů, a bez přepisu by v panelu
-    /// zůstaly dvě protichůdné věty o jednom souboji.
+    /// Ohlásí souboj, nebo předchozí hlášku o témže souboji přepíše. Výsledek, utrpěné a dané
+    /// poškození dorazí po částech a bez přepisu by v panelu zůstalo několik protichůdných vět
+    /// o jednom souboji.
     /// </summary>
     private bool AnnounceCombat(CombatRound combat)
     {
@@ -588,6 +671,15 @@ public sealed partial class GameStateTracker
             return false;
         }
 
+        // V Duos hra tag zapíše dvakrát, když lokální hráč bojoval první: jednou za soubojovou
+        // kopii spoluhráče, která souboj dobojovávala, a hned potom znovu za vlastního hrdinu,
+        // takže druhá hodnota je dvojnásobek. Ve všech pěti měřených zápasech odpovídal
+        // skutečný úbytek životů týmu vždy první hodnotě (4→8, 12→24, 15→30, 9→18, 7→14).
+        if (State.IsDuos && combat.DamageTaken is > 0)
+        {
+            return false;
+        }
+
         combat.DamageTaken = damage;
         combat.Outcome ??= "LOST";
         return AnnounceCombat(combat);
@@ -602,21 +694,46 @@ public sealed partial class GameStateTracker
 
         if (!inCombat)
         {
-            // Souboj bez jediného útoku se zachytí aspoň takhle, byť už po odklizení desek.
-            if (!combatBoardsCaptured)
+            // Souboj bez jediného útoku se zachytí aspoň takhle, byť už po odklizení desek. Jen
+            // na straně, kde se hrdina nestřídal: po výměně by se pod odcházejícího hrdinu
+            // uložily zbytky desky toho, kdo přišel po něm.
+            if (localCapturePending && !localSideSwitched)
             {
-                CaptureCombatBoards();
+                CaptureSide(local: true);
             }
 
+            if (opponentCapturePending && !opponentSideSwitched)
+            {
+                CaptureSide(local: false);
+            }
+
+            localCapturePending = false;
+            opponentCapturePending = false;
+            localSideHeroId = LocalLobbyHeroId() ?? localSideHeroId;
+            opponentSideHeroId = null;
             State.IsCombatPhase = false;
             State.Epoch++;
             State.CurrentCombat = null;
+            State.CombatLocalSlot = null;
+            State.CombatOpponentSlot = null;
             return true;
         }
 
         State.IsCombatPhase = true;
         State.Epoch++;
-        combatBoardsCaptured = false;
+        capturedSlotsThisCombat.Clear();
+        localSideSwitched = false;
+        opponentSideSwitched = false;
+        localCapturePending = true;
+        opponentCapturePending = true;
+
+        // Na začátku souboje stojí na lokální straně vlastní hrdina; v Duos ho HERO_ENTITY
+        // vymění za spoluhráče ještě před prvním útokem, pokud bojuje první. Soupeřova strana
+        // se doplní, až hra na soupeřovu entitu hráče pověsí soubojovou kopii hrdiny.
+        localSideHeroId = LocalLobbyHeroId() ?? localSideHeroId;
+        opponentSideHeroId = null;
+        State.CombatLocalSlot = SlotOf(localSideHeroId) ?? State.LocalPlayerSlot;
+        State.CombatOpponentSlot = State.NextOpponentPlayerId;
         FinishPreviousCombat();
         var combat = new CombatRound(State.Round, State.NextOpponentPlayerId);
         if (State.NextOpponent is { } opponent)
@@ -659,33 +776,156 @@ public sealed partial class GameStateTracker
     }
 
     /// <summary>
-    /// Uloží obě desky k příslušným slotům v lobby. Cizí desku log ukáže jen během souboje proti
-    /// ní, takže tohle je jediná příležitost, jak se k ní vůbec dostat.
+    /// Uloží desky obou stran k hrdinům, kteří na nich právě stojí. Cizí desku log ukáže jen
+    /// během souboje proti ní, takže tohle je jediná příležitost, jak se k ní vůbec dostat.
+    /// V Duos tak postupně přibude deska spoluhráče i obou soupeřů.
     /// </summary>
     private void CaptureCombatBoards()
     {
-        combatBoardsCaptured = true;
-        if (CombatOpponentSlot() is { } opponentSlot)
+        if (localCapturePending)
         {
-            StoreBoard(opponentSlot, State.OpponentBoard);
+            CaptureSide(local: true);
         }
 
-        if (State.LocalPlayerSlot is { } localSlot)
+        if (opponentCapturePending)
         {
-            StoreBoard(localSlot, State.PlayerBoard);
+            CaptureSide(local: false);
         }
     }
 
-    private void StoreBoard(int lobbyPlayerId, IReadOnlyList<BoardMinion> board)
+    /// <summary>
+    /// Uloží desku jedné strany k hrdinovi, který na ní stojí. Když hrdina slot nemá, na lokální
+    /// straně se bere slot lokálního hráče, na soupeřově soubojová kopie hrdiny se slotem.
+    /// </summary>
+    private void CaptureSide(bool local)
+    {
+        var slot = local
+            ? SlotOf(localSideHeroId) ?? State.LocalPlayerSlot
+            : SlotOf(opponentSideHeroId) ?? CombatOpponentSlot();
+        if (local)
+        {
+            localCapturePending = false;
+        }
+        else
+        {
+            opponentCapturePending = false;
+        }
+
+        // Za zachycený se slot bere jen s neprázdnou deskou. Hrdina s prázdnou deskou se může do
+        // souboje vrátit později s plnou, typicky když spoluhráč bojoval první a vlastní miniony
+        // se na desku postaví až s příchodem vlastního hrdiny.
+        if (slot is { } known && StoreBoard(known, local ? State.PlayerBoard : State.OpponentBoard))
+        {
+            capturedSlotsThisCombat.Add(known);
+        }
+    }
+
+    /// <summary>
+    /// Sleduje, kdo stojí na které straně desky, podle <c>HERO_ENTITY</c> entit hráčů. V Duos
+    /// hra během souboje přepíná obě strany mezi oběma hrdiny dvojice: první bojuje, a jakmile
+    /// padne některá z desek, přijde na tutéž stranu druhý hrdina s vlastní deskou. Bez tohoto
+    /// sledování by se deska spoluhráče ukládala pod lokálního hráče a druhý soupeř by neměl
+    /// desku vůbec. Bere se jen z <c>GameState</c>; opožděná fronta by strany vracela zpátky.
+    /// </summary>
+    private bool TrackSideHero(string owner, string value)
+    {
+        if (IsNumericEntity(owner) || !TryInt(value, out var heroEntityId) ||
+            State.LocalPlayerEntity is not { } localName)
+        {
+            return false;
+        }
+
+        var local = BaseName(owner).Equals(localName, StringComparison.Ordinal);
+        var previous = local ? localSideHeroId : opponentSideHeroId;
+        if (previous == heroEntityId)
+        {
+            return false;
+        }
+
+        if (State.IsCombatPhase && SlotOf(previous) is not null)
+        {
+            // Hrdinu vystřídal jiný. Deska, která ještě neprošla útokem, se uloží teď; jinak by se
+            // pod odcházejícího hrdinu zapsala deska toho, kdo přichází.
+            if (local ? localCapturePending : opponentCapturePending)
+            {
+                CaptureSide(local);
+            }
+
+            if (local)
+            {
+                localSideSwitched = true;
+            }
+            else
+            {
+                opponentSideSwitched = true;
+            }
+        }
+
+        if (local)
+        {
+            localSideHeroId = heroEntityId;
+        }
+        else
+        {
+            opponentSideHeroId = heroEntityId;
+        }
+
+        if (!State.IsCombatPhase)
+        {
+            return false;
+        }
+
+        RefreshCombatSlots(State.Entity(heroEntityId));
+        return true;
+    }
+
+    /// <summary>
+    /// Doplní slot strany podle hrdiny, který na ní stojí, a nastaví jí čekání na uložení desky.
+    /// Volá se po <c>HERO_ENTITY</c> i po <c>PLAYER_ID</c>, protože slot může na soubojovou kopii
+    /// dorazit až po tom, co ji hra pověsí na entitu hráče. Hrdina bez slotu, typicky Bob na
+    /// konci souboje, žádnou desku k uložení nemá.
+    /// </summary>
+    private void RefreshCombatSlots(TrackedEntity hero)
+    {
+        if (!State.IsCombatPhase)
+        {
+            return;
+        }
+
+        var slot = hero.IsHero ? hero.LobbyPlayerId : null;
+        var pending = slot is { } known && !capturedSlotsThisCombat.Contains(known);
+        if (hero.EntityId == localSideHeroId)
+        {
+            localCapturePending = pending;
+            State.CombatLocalSlot = slot ?? State.CombatLocalSlot;
+        }
+
+        if (hero.EntityId == opponentSideHeroId)
+        {
+            opponentCapturePending = pending;
+            State.CombatOpponentSlot = slot ?? State.CombatOpponentSlot;
+        }
+    }
+
+    private int? SlotOf(int? entityId) =>
+        entityId is { } id && State.TryGetEntity(id, out var hero) && hero.IsHero ? hero.LobbyPlayerId : null;
+
+    /// <summary>Entita hrdiny lokálního hráče v lobby, tedy ta, která drží jeho živé statistiky.</summary>
+    private int? LocalLobbyHeroId() =>
+        State.LocalPlayerSlot is { } slot && leaderboardHeroes.TryGetValue(slot, out var hero) ? hero : null;
+
+    /// <summary>Uloží desku ke slotu. Prázdnou desku neukládá a vrací <c>false</c>.</summary>
+    private bool StoreBoard(int lobbyPlayerId, IReadOnlyList<BoardMinion> board)
     {
         if (board.Count == 0)
         {
-            return;
+            return false;
         }
 
         var participant = State.LobbyParticipant(lobbyPlayerId);
         participant.LastBoard = board;
         participant.LastBoardRound = State.Round;
+        return true;
     }
 
     /// <summary>
@@ -759,12 +999,22 @@ public sealed partial class GameStateTracker
     };
 
     /// <summary>
-    /// Popisek souboje. I v Duos se nastupuje proti jedinému soupeři; druhého z dvojice si bere
-    /// spoluhráč a v logu po něm nezůstane ani stopa. Uvádět obě jména by tvrdilo, že se bojovalo
-    /// proti oběma.
+    /// Popisek souboje. V Duos se bojuje proti celé dvojici: první z ní nastupuje hned a druhý
+    /// se přidá, jakmile padne některá z desek. V logu se soubojové kopie obou soupeřů během
+    /// jednoho souboje vystřídají na téže straně desky, takže hláška jmenuje oba.
     /// </summary>
-    private string OpponentLabel(CombatRound combat) =>
-        SlotLabel(combat.OpponentPlayerId, combat.OpponentHeroName, combat.OpponentBattleTag);
+    private string OpponentLabel(CombatRound combat)
+    {
+        var first = SlotLabel(combat.OpponentPlayerId, combat.OpponentHeroName, combat.OpponentBattleTag);
+        if (!State.IsDuos || combat.OpponentTeammatePlayerId is null)
+        {
+            return first;
+        }
+
+        var second = SlotLabel(combat.OpponentTeammatePlayerId, combat.OpponentTeammateHeroName,
+            combat.OpponentTeammateBattleTag);
+        return $"{first} + {second}";
+    }
 
     private string SlotLabel(int? playerId, string? heroName, string? battleTag)
     {
@@ -794,8 +1044,10 @@ public sealed partial class GameStateTracker
             return;
         }
 
+        // V Duos sdílí dvojice životy, takže poškození roste na obou soupeřích stejně.
         var combat = State.CombatHistory[^1];
-        if (entity.LobbyPlayerId != combat.OpponentPlayerId)
+        if (entity.LobbyPlayerId != combat.OpponentPlayerId &&
+            (combat.OpponentTeammatePlayerId is null || entity.LobbyPlayerId != combat.OpponentTeammatePlayerId))
         {
             return;
         }
@@ -843,24 +1095,69 @@ public sealed partial class GameStateTracker
         !battleTag.Equals(State.LocalPlayerEntity, StringComparison.Ordinal) ||
         lobbyPlayerId == localSlot;
 
-    /// <summary>Oba hrdiny téhož týmu; mimo Duos jen hráče samotného.</summary>
+    /// <summary>Oba hrdiny téhož týmu, lokální hráč první; mimo Duos jen hráče samotného.</summary>
     private IReadOnlyList<LobbyParticipant> TeamOf(LobbyParticipant participant) =>
         participant.TeamId is { } teamId
-            ? [.. State.LobbyParticipants.Where(member => member.TeamId == teamId)]
+            ?
+            [
+                .. State.LobbyParticipants
+                    .Where(member => member.TeamId == teamId)
+                    .OrderByDescending(member => member.IsLocal)
+                    .ThenByDescending(member => member.IsTeammate)
+                    .ThenBy(member => member.PlayerId)
+            ]
             : [participant];
 
     /// <summary>
-    /// Doplněk hlášky o souboji: kolik poškození padlo na kterou stranu. U remízy nepadlo nic,
-    /// takže se nepíše nic.
+    /// V Duos sdílí dvojice jednu zásobu životů: hra píše <c>HEALTH</c>, <c>ARMOR</c> i
+    /// <c>DAMAGE</c> na oba hrdiny se stejnou hodnotou, jen ne ve stejném okamžiku (naměřeno
+    /// až 4 400 řádků rozestupu). Bez zrcadlení by tabulka chvíli ukazovala dva různé stavy
+    /// jednoho týmu a vyřazení by se hlásilo po hráčích, ačkoli padá celý tým najednou.
     /// </summary>
-    private static string DamageSummary(CombatRound combat)
+    private void MirrorTeamHealth(LobbyParticipant participant)
     {
-        if (combat.DamageTaken is > 0)
+        if (!State.IsDuos || participant.TeamId is not { } teamId)
         {
-            return $", dostal jsem {combat.DamageTaken} dmg";
+            return;
         }
 
-        return combat.DamageDealt is > 0 ? $", dal jsem {combat.DamageDealt} dmg" : string.Empty;
+        foreach (var mate in State.LobbyParticipants)
+        {
+            if (mate.TeamId != teamId || ReferenceEquals(mate, participant))
+            {
+                continue;
+            }
+
+            mate.Health = participant.Health ?? mate.Health;
+            mate.Armor = participant.Armor ?? mate.Armor;
+            mate.Damage = participant.Damage ?? mate.Damage;
+
+            // Zrcadlí se i entita hrdiny spoluhráče v lobby. Její vlastní tag dorazí později
+            // a do té doby by ji každá další zmínka v logu vrátila na starou hodnotu, čímž by
+            // spoluhráč, a přes zrcadlení i lokální hráč, na chvíli obživl.
+            if (leaderboardHeroes.TryGetValue(mate.PlayerId, out var heroId) &&
+                State.TryGetEntity(heroId, out var hero))
+            {
+                hero.Health = participant.Health ?? hero.Health;
+                hero.Armor = participant.Armor ?? hero.Armor;
+                hero.Damage = participant.Damage ?? hero.Damage;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Doplněk hlášky o souboji: kolik poškození padlo na kterou stranu. U remízy nepadlo nic,
+    /// takže se nepíše nic. V Duos ho dostává i dává tým, proto množné číslo.
+    /// </summary>
+    private string DamageSummary(CombatRound combat)
+    {
+        var (took, dealt) = State.IsDuos ? ("dostali jsme", "dali jsme") : ("dostal jsem", "dal jsem");
+        if (combat.DamageTaken is > 0)
+        {
+            return $", {took} {combat.DamageTaken} dmg";
+        }
+
+        return combat.DamageDealt is > 0 ? $", {dealt} {combat.DamageDealt} dmg" : string.Empty;
     }
 
     private void MarkTeammate(int playerId)
@@ -915,7 +1212,8 @@ public sealed partial class GameStateTracker
         tavernUpgradeCosts.Clear();
         cardNames.Clear();
         leaderboardHeroes.Clear();
-        eliminatedSlots.Clear();
+        eliminations.Clear();
+        capturedSlotsThisCombat.Clear();
         localPlayerId = null;
         localPlayerEntityId = null;
         announcedCombat = null;
@@ -923,7 +1221,12 @@ public sealed partial class GameStateTracker
         localTeamId = null;
         announcedGameOver = false;
         announcedRound = null;
-        combatBoardsCaptured = false;
+        localSideHeroId = null;
+        opponentSideHeroId = null;
+        localCapturePending = false;
+        opponentCapturePending = false;
+        localSideSwitched = false;
+        opponentSideSwitched = false;
     }
 
     /// <summary>
@@ -1115,6 +1418,8 @@ public sealed partial class GameStateTracker
             participant.LeaderboardPlace = entity.LeaderboardPlace ?? participant.LeaderboardPlace;
             participant.Triples = entity.Triples ?? participant.Triples;
             participant.PlayState = entity.PlayState ?? participant.PlayState;
+            participant.FightsFirstNextCombat = entity.FightsFirstNextCombat ?? participant.FightsFirstNextCombat;
+            MirrorTeamHealth(participant);
         }
 
         // Jeden BattleTag může patřit jen jednomu slotu. V Duos hra přepíná HERO_ENTITY jedné
@@ -1144,36 +1449,118 @@ public sealed partial class GameStateTracker
         AnnounceElimination(participant);
     }
 
+    /// <summary>
+    /// Ohlásí vyřazení hráče, v Duos celého týmu. Hláška se pamatuje, protože umístění, které
+    /// tag <c>PLAYER_LEADERBOARD_PLACE</c> nese v okamžiku vyřazení, je ještě živé pořadí z doby,
+    /// kdy hráč žil; skutečné dorazí až o kus dál a hláška se pak přepíše na místě.
+    /// </summary>
     private void AnnounceElimination(LobbyParticipant participant)
     {
-        if (!participant.IsEliminated || !eliminatedSlots.Add(participant.PlayerId))
+        if (!participant.IsEliminated)
         {
             return;
         }
 
-        var label = ParticipantLabel(participant);
-        if (!State.IsDuos)
+        // V Duos sdílí dvojice životy, takže se zrcadlením padají oba hrdinové zároveň. Kdyby
+        // přece jen padl jen jeden, hlásí se to bez umístění: to patří týmu, a ten hraje dál.
+        var team = State.IsDuos ? TeamOf(participant) : [participant];
+        var teamGone = team.All(member => member.IsEliminated);
+        var key = State.IsDuos && teamGone && participant.TeamId is { } teamId ? -teamId : participant.PlayerId;
+        if (eliminations.TryGetValue(key, out var note))
         {
-            State.AddEvent(participant.LeaderboardPlace is { } place
-                ? $"{label} vypadl na {place}. místě."
-                : $"{label} vypadl.");
+            // Umístění z tagu se po vyřazení ještě několikrát přeskládá, než se usadí; hlášku
+            // podle něj přepisujeme jen tam, kde se spočítat nedalo.
+            if (teamGone && !note.Computed && participant.LeaderboardPlace is { } place && place != note.TagPlace)
+            {
+                var updated = EliminationMessage(participant, team, teamGone, place);
+                var replaced = State.UpdateEvent(note.Message, updated);
+                eliminations[key] = note with { Message = replaced ? updated : note.Message, TagPlace = place, Place = place };
+            }
+
             return;
         }
 
-        // V Duos padá tým až s druhým hrdinou a PLAYER_LEADERBOARD_PLACE nese umístění týmu.
-        // Ohlásit ho u prvního mrtvého spoluhráče by tvrdilo, že tým skončil, i když hraje dál.
-        var team = TeamOf(participant);
-        if (team.All(member => member.IsEliminated))
+        var computed = teamGone && CanComputeEliminationPlace();
+        var announcedPlace = teamGone ? computed ? ComputedEliminationPlace() : participant.LeaderboardPlace : null;
+        var message = EliminationMessage(participant, team, teamGone, announcedPlace);
+        eliminations[key] = new EliminationNote(
+            message, participant.LeaderboardPlace, State.Round, announcedPlace, computed, participant, team);
+        State.AddEvent(message);
+        if (computed)
         {
-            var names = string.Join(" + ", team.Select(ParticipantLabel));
-            State.AddEvent(participant.LeaderboardPlace is { } teamPlace
-                ? $"Tým {names} vypadl na {teamPlace}. místě."
-                : $"Tým {names} vypadl.");
-            return;
+            RerankEliminationsOfRound(State.Round);
         }
-
-        State.AddEvent($"{label} vypadl, tým hraje dál.");
     }
+
+    /// <summary>
+    /// Padnou-li v jednom kole dva hráči, v Duos dva týmy, rozhoduje mezi nimi hra podle
+    /// zbývajících životů: kdo skončil blíž nule, je výš (naměřeno: −1 před −14 v sólu, −3 před
+    /// −4 v Duos). Pořadí tagů <c>DAMAGE</c> v logu to sledovat nemusí, takže se skupina po
+    /// každém dalším pádu přeřadí a dotčené hlášky přepíšou.
+    /// </summary>
+    private void RerankEliminationsOfRound(int? round)
+    {
+        var group = eliminations
+            .Where(pair => pair.Value.Computed && pair.Value.Round == round && pair.Value.Place is not null)
+            .ToArray();
+        if (group.Length < 2)
+        {
+            return;
+        }
+
+        var places = group.Select(pair => pair.Value.Place!.Value).OrderBy(place => place).ToArray();
+        var ranked = group
+            .OrderByDescending(pair => pair.Value.Participant.RemainingHealth ?? int.MinValue)
+            .ThenBy(pair => pair.Value.Participant.PlayerId)
+            .ToArray();
+        for (var index = 0; index < ranked.Length; index++)
+        {
+            var (key, note) = ranked[index];
+            if (note.Place == places[index])
+            {
+                continue;
+            }
+
+            var updated = EliminationMessage(note.Participant, note.Team, teamGone: true, places[index]);
+            var replaced = State.UpdateEvent(note.Message, updated);
+            eliminations[key] = note with { Message = replaced ? updated : note.Message, Place = places[index] };
+        }
+    }
+
+    private string EliminationMessage(LobbyParticipant participant, IReadOnlyList<LobbyParticipant> team,
+        bool teamGone, int? place)
+    {
+        if (!teamGone)
+        {
+            return $"{ParticipantLabel(participant)} vypadl, tým hraje dál.";
+        }
+
+        var who = State.IsDuos
+            ? $"Tým {string.Join(" + ", team.Select(ParticipantLabel))}"
+            : ParticipantLabel(participant);
+        return place is { } number ? $"{who} vypadl na {number}. místě." : $"{who} vypadl.";
+    }
+
+    /// <summary>
+    /// Umístění vyřazeného hráče se dá spočítat, jen když je lobby kompletní: osm hráčů, v Duos
+    /// navíc ve čtyřech známých týmech.
+    /// </summary>
+    private bool CanComputeEliminationPlace() =>
+        State.LobbyParticipants.Count == 8 &&
+        (!State.IsDuos || State.LobbyParticipants.Select(candidate => candidate.TeamId).Distinct().Count() == 4 &&
+                          State.LobbyParticipants.All(candidate => candidate.TeamId is not null));
+
+    /// <summary>
+    /// Umístění právě vyřazeného hráče z počtu těch, kdo zůstali ve hře. Tag umístění v tu chvíli
+    /// ještě nese živé pořadí z doby, kdy hráč žil (naměřeno: hráč vyřazený jako pátý měl v tu
+    /// chvíli dvojku), a skutečné se po vyřazení ještě několikrát přeskládá, než se usadí.
+    /// V Duos se počítají týmy, protože místo dostává tým.
+    /// </summary>
+    private int ComputedEliminationPlace() => State.IsDuos
+        ? 1 + State.LobbyParticipants
+            .GroupBy(candidate => candidate.TeamId)
+            .Count(candidates => candidates.Any(member => !member.IsEliminated))
+        : 1 + State.LobbyParticipants.Count(candidate => !candidate.IsEliminated);
 
     private int? ResolveLobbySlot(string entity, int? entityId)
     {
@@ -1221,6 +1608,7 @@ public sealed partial class GameStateTracker
                 break;
         }
 
+        MirrorTeamHealth(lobbyParticipant);
         AnnounceElimination(lobbyParticipant);
     }
 

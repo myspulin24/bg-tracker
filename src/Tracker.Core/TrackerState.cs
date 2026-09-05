@@ -101,6 +101,31 @@ public sealed class TrackerState
     /// <summary>Slot spoluhráče lokálního hráče z tagu <c>BACON_DUO_TEAMMATE_PLAYER_ID</c>.</summary>
     public int? TeammatePlayerId { get; internal set; }
 
+    /// <summary>
+    /// Bojuje lokální hráč v příštím souboji jako první ze své dvojice? Tag
+    /// <c>BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT</c> na entitě hráče; mimo Duos prázdné.
+    /// Kdo bojuje první, nastupuje proti <see cref="NextOpponent"/>; druhý ze soupeřů se přidá,
+    /// až padne některá z desek.
+    /// </summary>
+    public bool? LocalFightsFirst { get; internal set; }
+
+    /// <summary>
+    /// Slot hrdiny, který právě bojuje na straně lokálního hráče. V Duos hra na tutéž stranu
+    /// desky (<c>CONTROLLER</c>) postupně posílá oba hrdiny týmu, takže <see cref="PlayerBoard"/>
+    /// může během souboje patřit spoluhráči. Mimo souboj prázdné.
+    /// </summary>
+    public int? CombatLocalSlot { get; internal set; }
+
+    /// <summary>Slot hrdiny, který právě bojuje na soupeřově straně; v Duos se během souboje mění.</summary>
+    public int? CombatOpponentSlot { get; internal set; }
+
+    /// <summary>Na straně lokálního hráče právě bojuje spoluhráč, takže <see cref="PlayerBoard"/> je jeho deska.</summary>
+    public bool IsTeammateFighting =>
+        IsDuos && IsCombatPhase && TeammatePlayerId is { } mate && CombatLocalSlot == mate;
+
+    /// <summary>Hrdina, který právě stojí na soupeřově straně desky.</summary>
+    public LobbyParticipant? CombatOpponent => Slot(CombatOpponentSlot);
+
     /// <summary>Kolik míst se v této lobby rozdává: osm v sólu, čtyři v Duos.</summary>
     public int PlaceCount => IsDuos ? 4 : 8;
 
@@ -151,8 +176,9 @@ public sealed class TrackerState
 
     /// <summary>
     /// Žebříček po týmech. V Duos nesou oba spoluhráči stejné <c>PLAYER_LEADERBOARD_PLACE</c>,
-    /// takže řadit hráče jednotlivě by dvojice roztrhalo. Týmy se proto řadí podle součtu
-    /// zbývajících životů a uvnitř týmu jde první lokální hráč.
+    /// takže řadit hráče jednotlivě by dvojice roztrhalo. Týmy se proto řadí podle zbývajících
+    /// životů týmu a uvnitř týmu jde první lokální hráč. Dvojice sdílí jednu zásobu životů,
+    /// takže se bere vyšší z obou hodnot, ne součet; ten by životy počítal dvakrát.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<LobbyParticipant>> Teams =>
     [
@@ -171,7 +197,7 @@ public sealed class TrackerState
             .ThenBy(team => team.All(participant => participant.IsEliminated)
                 ? team.Min(participant => participant.LeaderboardPlace ?? int.MaxValue)
                 : 0)
-            .ThenByDescending(team => team.Sum(participant => participant.RemainingHealth ?? 0))
+            .ThenByDescending(team => team.Max(participant => participant.RemainingHealth ?? 0))
             .ThenBy(team => team.Min(participant => participant.PlayerId))
     ];
 
@@ -303,6 +329,9 @@ public sealed class TrackerState
         NextOpponentTeammatePlayerId = null;
         IsDuos = false;
         TeammatePlayerId = null;
+        LocalFightsFirst = null;
+        CombatLocalSlot = null;
+        CombatOpponentSlot = null;
         FinalPlace = null;
         CurrentCombat = null;
         participants.Clear();

@@ -41,6 +41,61 @@ public sealed class BattlegroundsStateTests
         GameState + "TAG_CHANGE Entity=Hráč#21600 tag=HERO_ENTITY value=116"
     ];
 
+    /// <summary>Hrdina soupeře v lobby, jak ho hra vypíše při startu hry.</summary>
+    private static string[] LobbyHero(int entityId, int slot, string name) =>
+    [
+        GameState + $"FULL_ENTITY - Creating ID={entityId} CardID=BG20_HERO_{slot:000}",
+        GameState + "    tag=CONTROLLER value=15",
+        GameState + "    tag=CARDTYPE value=HERO",
+        GameState + $"    tag=PLAYER_ID value={slot}",
+        GameState + "    tag=HEALTH value=30",
+        GameState + "    tag=ZONE value=SETASIDE",
+        GameState + $"FULL_ENTITY - Updating [entityName={name} id={entityId} zone=SETASIDE zonePos=0 cardId=BG20_HERO_{slot:000} player=15] CardID=BG20_HERO_{slot:000}"
+    ];
+
+    private static string HeroTag(int entityId, int slot, string name, string tag, int value) =>
+        GameState + $"TAG_CHANGE Entity=[entityName={name} id={entityId} zone=SETASIDE zonePos=0 cardId=BG20_HERO_{slot:000} player=15] tag={tag} value={value}";
+
+    [Fact]
+    public void PlacesEliminatedPlayersByWhoIsLeftAndOrdersSameRoundDeathsByRemainingHealth()
+    {
+        var tracker = Replay([
+            .. Opening(),
+            .. LobbyHero(131, 1, "Patches the Pirate"),
+            .. LobbyHero(132, 2, "Millificent Manastorm"),
+            .. LobbyHero(133, 3, "Kurtrus Ashfallen"),
+            .. LobbyHero(134, 4, "Shudderwock"),
+            .. LobbyHero(135, 5, "Heistbaron Togwaggle"),
+            .. LobbyHero(136, 6, "Rock Master Voone"),
+            .. LobbyHero(138, 8, "Murloc Holmes"),
+            GameState + "TAG_CHANGE Entity=GameEntity tag=TURN value=19",
+            // Tag umístění v okamžiku vyřazení ještě nese živé pořadí z doby, kdy hráč žil;
+            // naměřeno na hráči vyřazeném jako pátý s dvojkou. Místo se proto počítá z toho,
+            // kolik hráčů zůstalo ve hře.
+            HeroTag(133, 3, "Kurtrus Ashfallen", "PLAYER_LEADERBOARD_PLACE", 2),
+            HeroTag(133, 3, "Kurtrus Ashfallen", "DAMAGE", 30)
+        ]);
+
+        Assert.Contains("Kurtrus Ashfallen vypadl na 8. místě.", tracker.State.RecentEvents);
+
+        // Dva pády v jednom kole: výš končí ten, kdo skončil blíž nule, ať tagy DAMAGE přišly
+        // v jakémkoli pořadí. Hláška prvního z nich se přepíše na místě.
+        var parser = new PowerLogParser();
+        foreach (var line in new[]
+        {
+            GameState + "TAG_CHANGE Entity=GameEntity tag=TURN value=21",
+            HeroTag(135, 5, "Heistbaron Togwaggle", "DAMAGE", 31),
+            HeroTag(134, 4, "Shudderwock", "DAMAGE", 44)
+        })
+        {
+            tracker.Apply(parser.Parse(line));
+        }
+
+        Assert.Contains("Heistbaron Togwaggle vypadl na 6. místě.", tracker.State.RecentEvents);
+        Assert.Contains("Shudderwock vypadl na 7. místě.", tracker.State.RecentEvents);
+        Assert.DoesNotContain("Heistbaron Togwaggle vypadl na 7. místě.", tracker.State.RecentEvents);
+    }
+
     [Fact]
     public void TracksRoundGoldAndTavernUpgradeCost()
     {

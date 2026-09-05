@@ -15,10 +15,22 @@ public sealed class LobbyParticipant(int playerId)
 
     /// <summary>Spoluhráč lokálního hráče podle <c>BACON_DUO_TEAMMATE_PLAYER_ID</c>.</summary>
     public bool IsTeammate { get; internal set; }
+
+    /// <summary>
+    /// Bojuje v příštím souboji jako první ze své dvojice? Z tagu
+    /// <c>BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT</c> na entitě hrdiny; mimo Duos prázdné.
+    /// </summary>
+    public bool? FightsFirstNextCombat { get; internal set; }
+
     public string? BattleTag { get; internal set; }
     public string? HeroName { get; internal set; }
     public string? HeroCardId { get; internal set; }
+    /// <summary>
+    /// Životy, armor a poškození. V Duos sdílí dvojice jednu zásobu životů a hra píše všechny
+    /// tři tagy na oba hrdiny se stejnou hodnotou, takže tracker hodnoty mezi spoluhráči zrcadlí.
+    /// </summary>
     public int? Health { get; internal set; }
+
     public int? Armor { get; internal set; }
     public int? Damage { get; internal set; }
     public int? TavernTier { get; internal set; }

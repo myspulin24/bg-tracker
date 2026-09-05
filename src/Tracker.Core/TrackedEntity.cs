@@ -23,6 +23,22 @@ public sealed class TrackedEntity(int entityId)
     /// <summary>Tým 1 až 4 z tagu <c>BACON_DUO_TEAM_ID</c>; mimo režim Duos zůstává prázdný.</summary>
     public int? DuoTeamId { get; internal set; }
 
+    /// <summary>
+    /// Bojuje tenhle hrdina v příštím souboji jako první ze své dvojice? Tag
+    /// <c>BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT</c> hra píše na konci každého souboje na
+    /// všechny hrdiny lobby i na entitu lokálního hráče. Mimo Duos nepadá.
+    /// </summary>
+    public bool? FightsFirstNextCombat { get; internal set; }
+
+    /// <summary>
+    /// Karta, která by spoluhráči složila pár, respektive triple (tagy
+    /// <c>BACON_DUO_PAIR_CANDIDATE_TEAMMATE</c> a <c>BACON_DUO_TRIPLE_CANDIDATE_TEAMMATE</c>).
+    /// Hra ji značí v nabídce Boba i v ruce; mimo Duos tagy nepadají.
+    /// </summary>
+    public bool IsTeammatePairCandidate { get; internal set; }
+
+    public bool IsTeammateTripleCandidate { get; internal set; }
+
     public int? Attack { get; internal set; }
     public int? Health { get; internal set; }
     public int? Armor { get; internal set; }

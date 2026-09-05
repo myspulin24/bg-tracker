@@ -17,6 +17,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string tavernUpgrade = "Upgrade: —";
     private string nextOpponent = "Další soupeř: —";
     private string opposingBoardTitle = "NABÍDKA BOBA";
+    private string playerBoardTitle = "MOJE DESKA";
+    private string boardOwnerTitle = "MOJE DESKA";
+    private bool areBoardsCollapsed;
     private string availableRaces = "—";
     private string buffs = string.Empty;
     private bool hasBuffs;
@@ -97,6 +100,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string TavernUpgrade { get => tavernUpgrade; private set => Set(ref tavernUpgrade, value); }
     public string NextOpponent { get => nextOpponent; private set => Set(ref nextOpponent, value); }
     public string OpposingBoardTitle { get => opposingBoardTitle; private set => Set(ref opposingBoardTitle, value); }
+
+    /// <summary>
+    /// Nadpis vlastní desky. V Duos může na téže straně desky během souboje stát spoluhráč
+    /// a pak se to musí říct, jinak by uživatel svou desku hledal v cizí sestavě.
+    /// </summary>
+    public string PlayerBoardTitle { get => playerBoardTitle; private set => Set(ref playerBoardTitle, value); }
+
+    /// <summary>Sekce s deskami je sbalená; nadpis pak říká jen to, že je skrytá.</summary>
+    public bool AreBoardsCollapsed
+    {
+        get => areBoardsCollapsed;
+        set
+        {
+            Set(ref areBoardsCollapsed, value);
+            PlayerBoardTitle = value ? "DESKY (skryto)" : boardOwnerTitle;
+        }
+    }
     public string AvailableRaces { get => availableRaces; private set => Set(ref availableRaces, value); }
 
     /// <summary>Bonusy platné pro celou hru; prázdné, dokud žádný nenastane.</summary>
@@ -278,14 +298,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Gold = state.AvailableGold is { } available ? $"{available}/{state.Gold ?? available}" : "—";
         Place = state.LocalPlace is { } localPlace ? $"{localPlace}/{state.PlaceCount}" : "—";
         TavernUpgrade = $"Upgrade tavernu: {Value(state.TavernUpgradeCost)}";
-        NextOpponent = $"Další soupeř: {OpponentLabel(state)}";
+        NextOpponent = OpponentLine(state);
         AvailableRaces = state.AvailableRaces.Count == 0
             ? "Typy v nabídce: —"
             : "Typy: " + string.Join(" · ", state.AvailableRaces.Select(MinionRace.Display));
         Buffs = BuffSummary(state.Buffs);
         HasBuffs = Buffs.Length > 0;
         ApplySidePanel(state);
-        OpposingBoardTitle = state.IsCombatPhase ? "DESKA SOUPEŘE" : "NABÍDKA BOBA";
+        boardOwnerTitle = state.IsTeammateFighting
+            ? $"DESKA SPOLUHRÁČE · {state.Teammate?.HeroName ?? "souboj"}"
+            : "MOJE DESKA";
+        PlayerBoardTitle = AreBoardsCollapsed ? "DESKY (skryto)" : boardOwnerTitle;
+        OpposingBoardTitle = OpposingTitle(state);
         GameMode = state.IsDuos ? "DUOS" : "SÓLO";
         Result = state.FinalPlace is { } finalPlace
             ? $"{finalPlace}. místo"
@@ -392,9 +416,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return $"Deska z kola {participant.LastBoardRound?.ToString() ?? "—"}";
         }
 
-        // Proti spoluhráči se nikdy nenastupuje, takže by slib, že se deska ukáže, nikdy neplatil.
+        // Proti spoluhráči se nenastupuje, ale jeho deska se v logu objeví, jakmile sám bojuje:
+        // hra ji postaví na tutéž stranu desky jako tu vlastní.
         return participant.IsTeammate
-            ? "Desku spoluhráče log neukazuje"
+            ? "Desku spoluhráče uvidíte po jeho prvním souboji"
             : "Desku uvidíte, až proti tomuto hráči nastoupíte";
     }
 
@@ -414,14 +439,45 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return next;
     }
 
-    private static string OpponentLabel(TrackerState state)
+    /// <summary>
+    /// Řádek s dalším soupeřem. V Duos se bojuje proti celé dvojici: první nastupuje hrdina
+    /// z <c>NEXT_OPPONENT_PLAYER_ID</c>, druhý se přidá, až padne některá z desek. Kdo začíná
+    /// za náš tým, říká tag na entitě hráče; podle toho uživatel ví, proti komu nastoupí sám.
+    /// </summary>
+    private static string OpponentLine(TrackerState state)
     {
-        // Nastupuje se proti jednomu soupeři; druhého z dvojice bere spoluhráč. Uvádí se proto
-        // jako doplněk, ne jako druhý protivník.
-        var first = SlotLabel(state.NextOpponent, state.NextOpponentPlayerId);
-        return state.IsDuos && (state.NextOpponentTeammate is not null || state.NextOpponentTeammatePlayerId is not null)
-            ? $"{first} — v týmu s {SlotLabel(state.NextOpponentTeammate, state.NextOpponentTeammatePlayerId)}"
-            : first;
+        if (!state.IsDuos)
+        {
+            return $"Další soupeř: {SlotLabel(state.NextOpponent, state.NextOpponentPlayerId)}";
+        }
+
+        var first = HeroLabel(state.NextOpponent, state.NextOpponentPlayerId);
+        var second = state.NextOpponentTeammatePlayerId is null
+            ? string.Empty
+            : $" + {HeroLabel(state.NextOpponentTeammate, state.NextOpponentTeammatePlayerId)}";
+        var starter = state.LocalFightsFirst switch
+        {
+            true => " · první bojuji já",
+            false => " · první bojuje spoluhráč",
+            null => string.Empty
+        };
+        return $"Další soupeři: {first}{second}{starter}";
+    }
+
+    /// <summary>
+    /// Nadpis protější desky. V Duos se během souboje na soupeřově straně vystřídají oba
+    /// hrdinové dvojice, proto se píše, který z nich tam právě stojí.
+    /// </summary>
+    private static string OpposingTitle(TrackerState state)
+    {
+        if (!state.IsCombatPhase)
+        {
+            return "NABÍDKA BOBA";
+        }
+
+        return state.IsDuos && state.CombatOpponent?.HeroName is { } hero
+            ? $"DESKA SOUPEŘE · {hero}"
+            : "DESKA SOUPEŘE";
     }
 
     private static string SlotLabel(LobbyParticipant? participant, int? playerId) => participant is not null
@@ -429,6 +485,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         : playerId is { } slot
             ? $"hráč #{slot}"
             : "—";
+
+    /// <summary>Jen hrdina; v Duos jsou v řádku dva a s BattleTagy by se nevešel.</summary>
+    private static string HeroLabel(LobbyParticipant? participant, int? playerId) =>
+        participant?.HeroName ?? (playerId is { } slot ? $"hráč #{slot}" : "—");
 
     private static string TranslateResult(string? result) => result switch
     {

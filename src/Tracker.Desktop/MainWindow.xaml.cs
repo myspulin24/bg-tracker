@@ -115,7 +115,8 @@ public partial class MainWindow : Window
     {
         BoardsContent.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         BoardsChevron.Text = visible ? "▾" : "▸";
-        BoardsHeader.Text = visible ? "MOJE DESKA" : "DESKY (skryto)";
+        // Nadpis drží view model: v Duos říká, čí deska na lokální straně právě stojí.
+        viewModel.AreBoardsCollapsed = !visible;
         UpdateWindowHeight();
     }
 

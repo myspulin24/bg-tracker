@@ -356,12 +356,16 @@ Nabídka Boba i soupeřova deska sdílejí stejný `CONTROLLER`. Rozlišuje je j
 
 Cizí desku log ukáže jen během souboje proti ní. Tracker si ji proto uloží do
 `LobbyParticipant.LastBoard` spolu s číslem kola. Okamžik zachycení určuje první tag
-`PROPOSED_ATTACKER` daného souboje: v tu chvíli jsou obě desky postavené a ještě nikdo
-nezemřel, takže jde přesně o sestavu, se kterou soupeř nastoupil. Souboj, ve kterém
-nikdo nezaútočil, se zachytí až při jeho ukončení.
+`PROPOSED_ATTACKER` po příchodu hrdiny do souboje: v tu chvíli je jeho deska postavená
+a ještě nikdo nezemřel, takže jde přesně o sestavu, se kterou nastoupil. Souboj, ve kterém
+nikdo nezaútočil, se zachytí až při jeho ukončení, a to jen na straně, kde se hrdina
+nestřídal.
 
-Komu deska patří, se pozná podle soubojové kopie soupeřova hrdiny. Ta je spolehlivější
-než `NEXT_OPPONENT_PLAYER_ID`, který se v logu mění dřív, než souboj doopravdy začne.
+Komu deska patří, říká `HERO_ENTITY` entity hráče na dané straně: v sólu je na soupeřově
+straně jediná soubojová kopie hrdiny, v Duos se tam během souboje vystřídají oba hrdinové
+dvojice a na lokální straně může stát spoluhráč (kapitola 8.8). Když `HERO_ENTITY` slot
+neprozradí, bere se soubojová kopie hrdiny na soupeřově straně; ta je spolehlivější než
+`NEXT_OPPONENT_PLAYER_ID`, který se v logu mění dřív, než souboj doopravdy začne.
 
 Jména soupeřových minionů dorazí z opožděné fronty až po zachycení. Snímek se proto
 dodatečně dopisuje, jakmile se jméno entity poprvé zjistí, aby v přehledu nezůstalo
@@ -453,6 +457,14 @@ soupeře z `NEXT_OPPONENT_PLAYER_ID`. Výsledek se doplňuje až v následujíc�
 Konečné umístění se při `FINAL_GAMEOVER` bere z `PLAYER_LEADERBOARD_PLACE` lokálního hrdiny.
 Konec hry se hlásí jednou: umístěním, a jen když ho log nedá, holým výsledkem.
 
+Vyřazení se hlásí ve chvíli, kdy hráči dojdou životy. Tag `PLAYER_LEADERBOARD_PLACE` v tu chvíli
+ještě nese živé pořadí z doby, kdy hráč žil (naměřeno: hráč vyřazený jako pátý měl dvojku),
+a skutečné umístění se po vyřazení ještě několikrát přeskládá, než se usadí. Umístění se proto
+počítá z toho, kolik hráčů, v Duos týmů, zůstalo ve hře; tag se použije jen tehdy, když lobby
+není kompletní. Padnou-li dva hráči v jednom kole, rozhoduje mezi nimi zbývající počet životů:
+kdo skončil blíž nule, je výš (naměřeno −1 před −14 v sólu a −3 před −4 v Duos). Pořadí tagů
+`DAMAGE` to nemusí sledovat, takže se dotčené hlášky přepíšou na místě.
+
 ### 8.8 Režim Duos
 
 Duos pozná tracker podle tagů `BACON_DUO_*` a přepne se do `TrackerState.IsDuos`. Osm hráčů
@@ -463,28 +475,63 @@ tvoří čtyři dvojice a rozdávají se čtyři místa, ne osm (`PlaceCount`).
 | `BACON_DUO_TEAM_ID` | entita hrdiny, u lokálního hráče entita hráče | tým 1 až 4 |
 | `BACON_DUO_TEAMMATE_PLAYER_ID` | entita lokálního hráče | slot spoluhráče |
 | `NEXT_OPPONENT_TEAMMATE_PLAYER_ID` | entita lokálního hráče | druhý ze soupeřící dvojice |
+| `BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT` | entita hráče a všichni hrdinové lobby | kdo z dvojice bojuje v příštím souboji první |
+| `BACON_DUO_PAIR_CANDIDATE_TEAMMATE`, `BACON_DUO_TRIPLE_CANDIDATE_TEAMMATE` | karta v nabídce nebo v ruce | karta by spoluhráči složila pár či triple |
+| `IS_USING_PASS_OPTION` | karta v ruce | lokální hráč ji právě předává spoluhráči |
+| `BACON_DUO_PASSABLE` | karty v nabídce a v ruce | karta se dá předat; tracker ho nečte |
+| `BACON_TEAMMATE_BONUS_MINION_DAMAGE_LAST_COMBAT` | soupeřova entita hráče | příznak výpočtu poškození; tracker ho nečte |
+| `BACON_DUOS_PUNISH_LEAVERS` | `GameEntity` | trest za odchod ze hry; na konci hry padne na nulu |
 
 Dvojice **nejsou sousední sloty**. V pozorovaném logu tvořily tým sloty 3 a 8, takže se
 partner bez tagu odvodit nedá. Vlastní tým navíc hra napíše jinam než u ostatních: na entitu
 hráče, ne na entitu hrdiny. `LinkLocalTeam` proto číslo doplní lokálnímu hráči i jeho
 spoluhráči, ať přišlo z kterékoli strany.
 
-I v Duos se nastupuje proti **jedinému** soupeři; druhého z dvojice si bere spoluhráč a v logu
-po jeho souboji nezůstane nic. Ověřeno měřením u prvního útoku: na soupeřově straně stojí vždy
-jen jedna deska. `NEXT_OPPONENT_TEAMMATE_PLAYER_ID` je proto doplňková informace o dvojici, ne
-druhý protivník, a hláška o souboji jmenuje jen toho, proti komu se bojovalo. Desku druhého
-z dvojice tracker uvidí až v kole, kdy proti němu nastoupí sám.
+**Souboj je týmový a sekvenční.** Nastupuje ten z dvojice, koho označuje
+`BACON_DUO_PLAYER_FIGHTS_FIRST_NEXT_COMBAT`, proti tomu ze soupeřů, koho nese
+`NEXT_OPPONENT_PLAYER_ID`; v pěti měřených zápasech šlo vždy o soupeře s týmž příznakem.
+Jakmile padne některá z desek, přijde na tutéž stranu druhý hrdina té dvojice se svou deskou
+a bojuje proti tomu, co na druhé straně zbylo. V logu se `HERO_ENTITY` entity hráče přepne na
+soubojovou kopii druhého hrdiny a hra jeho miniony postaví na stejný `CONTROLLER`; podrobnosti
+v kapitole 8.9. Hláška o souboji proto jmenuje oba soupeře:
+`Kolo 3 · tým vs Overlord Saurfang + Snake Eyes: prohra, dostali jsme 4 dmg.` Řádek s dalším
+soupeřem jmenuje oba hrdiny dvojice v pořadí, v jakém nastoupí, a říká, kdo začíná za náš tým.
+
+Desky všech čtyř účastníků se ukládají po jednom: pro každou stranu desky tracker sleduje, čí
+hrdina na ní právě stojí, a jeho desku uloží při prvním útoku po jeho příchodu. Deska
+spoluhráče se tak objeví v podokně jeho řádku s číslem kola stejně jako desky obou soupeřů.
+Kdo přišel do souboje s prázdnou deskou, žádnou uloženou nemá.
+
+**Dvojice sdílí životy.** Hra píše `HEALTH`, `ARMOR` i `DAMAGE` na oba hrdiny se stejnou
+hodnotou, ale ne ve stejném okamžiku; naměřeno až 4 400 řádků rozestupu. Tracker proto hodnoty
+mezi spoluhráči zrcadlí, a to i do entity hrdiny v lobby, aby ho každá další zmínka v logu
+nevracela na starou hodnotu. Tým tak padá naráz a hlásí se jednou:
+`Tým Buttons + Tras'tath, Soul Parasite vypadl na 2. místě.` Řazení týmů v žebříčku bere vyšší
+z obou hodnot zbývajících životů, ne součet, který by životy počítal dvakrát.
+
+**Poškození dorazí dvakrát.** Když lokální hráč bojoval první a tým prohrál, zapíše hra
+`DAMAGE_DEALT_TO_HERO_LAST_TURN` dvakrát: jednou za soubojovou kopii spoluhráče, která souboj
+dobojovávala, a hned potom za vlastního hrdinu, takže druhá hodnota je dvojnásobek (4→8,
+12→24, 15→30, 9→18, 7→14). Skutečný úbytek životů týmu odpovídal ve všech pěti měřených
+zápasech první hodnotě, proto se v Duos bere první nenulový zápis a další v témže souboji se
+zahazují. Když bojoval první spoluhráč, přijde hodnota jen jednou. V sólu se nic nemění.
 
 Hlášky o souboji nesou číslo kola. Výsledek dorazí až v další nákupní fázi a u remízy dokonce
 až se začátkem dalšího souboje, takže by jinak visel pod nadpisem cizího kola.
 
 `PLAYER_LEADERBOARD_PLACE` nese v Duos umístění **týmu**, tedy 1 až 4, a oba spoluhráči mají
 stejné. Řadit hráče jednotlivě by dvojice roztrhalo, proto `TrackerState.Teams` seskupí lobby
-podle `TeamId`, týmy seřadí podle součtu zbývajících životů a uvnitř týmu dá dopředu lokálního
-hráče. Číslo místa se pak píše jen k prvnímu z dvojice.
+podle `TeamId`, týmy seřadí podle zbývajících životů a uvnitř týmu dá dopředu lokálního
+hráče. Číslo místa se pak píše jen k prvnímu z dvojice. Umístění vyřazeného týmu se počítá
+z počtu týmů, které zůstaly ve hře (kapitola 8.7); tag by v tu chvíli dal živé pořadí.
 
-Tým padá až s druhým hrdinou. U prvního mrtvého spoluhráče by ohlášení umístění tvrdilo, že
-tým skončil, i když hraje dál, takže se hlásí jen `X vypadl, tým hraje dál.`
+Předání karty spoluhráči se pozná podle `IS_USING_PASS_OPTION` na kartě v ruce: karta odejde do
+`SETASIDE` a u spoluhráče vznikne kopie, kterou už log neukáže. Tracker to ohlásí
+`Předal jsem spoluhráči: Proud Privateer.` Opačný směr, tedy karta od spoluhráče, v logu
+vlastní stopu nemá; v ruce se objeví jako každá jiná karta. Karty, které by spoluhráči složily
+pár nebo triple, hra značí tagy `BACON_DUO_PAIR_CANDIDATE_TEAMMATE` a
+`BACON_DUO_TRIPLE_CANDIDATE_TEAMMATE`; tracker je u minionů v nabídce vypisuje jako
+`pár pro spoluhráče`, respektive `triple pro spoluhráče`.
 
 ### 8.9 V Duos nese HERO_ENTITY cizí hrdiny
 
@@ -516,10 +563,17 @@ Ze stejného důvodu se živá deska nepřiřazuje podle `IsLocal`, ale podle `L
 spoluhráč sdílí v Duos tutéž stranu desky (`CONTROLLER`) jako lokální hráč, takže samotný
 příznak je na rozlišení příliš slabý.
 
-Deska spoluhráče se v logu samostatně neobjeví. Ověřeno měřením: mimo souboj je na straně
-lokálního hráče vždycky nanejvýš sedm minionů, tedy jen vlastní deska. Podokno u spoluhráče
-to říká rovnou, místo aby slibovalo desku, až proti němu uživatel nastoupí — proti
-spoluhráči se nenastupuje nikdy.
+Deska spoluhráče se mimo souboj v logu neobjeví: v nákupní fázi je na straně lokálního hráče
+vždycky nanejvýš sedm minionů, tedy jen vlastní deska. V souboji ale hra spoluhráčovy miniony
+postaví na tutéž stranu (`CONTROLLER`) jako ty vlastní, jakmile se do boje přidá, a tak se dá
+jeho deska uložit stejně jako soupeřova. Během souboje se proto vlastní deska nadepisuje podle
+toho, čí hrdina na lokální straně právě stojí: `MOJE DESKA`, nebo `DESKA SPOLUHRÁČE · Drek'Thar`.
+Na soupeřově straně se nadpis doplní o jméno hrdiny, který tam právě je.
+
+Kromě soubojových kopií, které bojují, vyrobí hra na začátku každého souboje ještě referenční
+kopie ostatních tří hrdinů i s jejich miniony v `SETASIDE` na lokální straně. Nesou
+`BACON_COMBAT_PHASE_HERO`, takže do lobby nezasahují, a do desek nevstupují, protože nejsou
+v `PLAY`.
 
 ## 9. Klíčové poznatky z reálného Battlegrounds logu
 
@@ -985,7 +1039,9 @@ v podokně; jméno archivu má přes čtyřicet znaků a z hlavičky přetékalo
 Po najetí myší na řádek se vlevo od overlaye otevře podokno s deskou daného hráče. Miniony
 v něm nejsou řádky, ale kartičky vedle sebe podle kapitoly 11.6.
 U lokálního hráče jde o živou desku, u ostatních o poslední, kterou log ukázal, s číslem
-kola. Dokud jste proti hráči nenastoupili, podokno to řekne místo prázdného seznamu.
+kola. Dokud jste proti hráči nenastoupili, podokno to řekne místo prázdného seznamu. V Duos
+se deska spoluhráče uloží z jeho souboje; do té doby podokno říká, že ji uvidíte po jeho
+prvním souboji.
 
 Následuje karta s vlastní deskou a pod ní buď `NABÍDKA BOBA`, nebo `DESKA SOUPEŘE` podle
 toho, jestli právě běží souboj. Každý řádek ukazuje pozici, hvězdičku u zlaté karty,
@@ -1005,10 +1061,19 @@ Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku z
 to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
 
 Panel `POSLEDNÍ UDÁLOSTI` se drží toho, co se týká vlastního hrdiny, respektive vlastního týmu
-v Duos. Souboj hlásí kolo, soupeře, výsledek a poškození: `Kolo 12 · tým vs Vanndar Stormpike:
-výhra, dal jsem 34 dmg.` Dané poškození log nehlásí zvlášť, počítá se z přírůstku tagu `DAMAGE`
+v Duos. Souboj hlásí kolo, soupeře, výsledek a poškození: `Kolo 12 · já vs Vanndar Stormpike:
+výhra, dal jsem 34 dmg.`, v Duos `Kolo 12 · tým vs Vanndar Stormpike + Reno Jackson: výhra,
+dali jsme 34 dmg.` Dané poškození log nehlásí zvlášť, počítá se z přírůstku tagu `DAMAGE`
 na soupeřově hrdinovi za dobu souboje. Vyřazení jmenuje **hrdinu**, ne hráče: hrdina se pamatuje
-lépe a v Duos ho log zná i u hráčů, jejichž BattleTag nikdy neodhalí.
+lépe a v Duos ho log zná i u hráčů, jejichž BattleTag nikdy neodhalí. V Duos se hlásí i předání
+karty spoluhráči: `Předal jsem spoluhráči: Proud Privateer.`
+
+V Duos má řádek s dalším soupeřem tvar `Další soupeři: Overlord Saurfang + Snake Eyes · první
+bojuje spoluhráč`: hrdinové v pořadí, v jakém nastoupí, a kdo začíná za náš tým. Nadpis vlastní
+desky se během souboje mění na `DESKA SPOLUHRÁČE · Drek'Thar`, když na lokální straně stojí
+spoluhráč, a nadpis soupeřovy desky nese jméno hrdiny, který na ní právě je. U minionů
+v nabídce Boba se zeleně vypisuje `pár pro spoluhráče` nebo `triple pro spoluhráče`, když to
+hra na kartě značí; podrobnosti v kapitole 8.8.
 
 Výsledek souboje se dozvídáme po částech — nejdřív jestli se vyhrálo, pak poškození jedné
 a druhé strany — a mezi tím se do panelu vejdou i jiné události. `TrackerState.UpdateEvent`
@@ -1471,7 +1536,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje padesát čtyři testů.
+Test suite aktuálně obsahuje sto sedmnáct testů.
 
 Původní čtyři:
 
@@ -1518,11 +1583,18 @@ Devět v `CardTextTests` pokrývá popisy karet: šest případů úklidu znače
 jen battlegroundských karet s textem, čtení uložené kopie místo dalšího stahování a použití
 i prošlé kopie, když se stažení nepovede.
 
-Sedm v `DuosTests` pokrývá režim Duos: rozpoznání a spárování dvojic z tagů, řazení týmů se
-zachováním dvojic pohromadě, pravidlo jeden BattleTag = jeden slot, pojmenování obou soupeřů
-v hlášce o souboji, ohlášení týmu až s druhým vyřazeným hrdinou a udržení identity
-lokálního hráče na jeho slotu i tehdy, když spoluhráč bojuje první, a to, že se jedno jméno
-nikdy neobjeví na dvou řádcích tabulky zároveň.
+Jedenáct v `DuosTests` pokrývá režim Duos: rozpoznání a spárování dvojic z tagů, řazení týmů se
+zachováním dvojic pohromadě, pravidlo jeden BattleTag = jeden slot, udržení identity lokálního
+hráče na jeho slotu i tehdy, když spoluhráč bojuje první, a to, že se jedno jméno nikdy
+neobjeví na dvou řádcích tabulky zároveň; dále pojmenování obou soupeřů v hlášce o souboji
+s první hodnotou zdvojeného poškození, ohlášení celého týmu naráz díky sdíleným životům,
+zrcadlení životů mezi spoluhráči, uložení desek všech čtyř účastníků souboje pod hrdiny, kteří
+s nimi bojovali, čtení toho, kdo bojuje první, spolu s nápovědou páru pro spoluhráče, a hlášku
+o kartě předané spoluhráči.
+
+Jeden v `BattlegroundsStateTests` navíc ověřuje umístění vyřazených hráčů: počítá se z počtu
+těch, kdo zůstali ve hře, a dva pády v jednom kole řadí zbývající životy, ať tagy `DAMAGE`
+přišly v jakémkoli pořadí.
 
 Dva v `MatchLogArchiveTests` pokrývají kompresi: zabalení dohraného zápasu se zachováním
 obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s ořezem retence.
@@ -1530,7 +1602,7 @@ obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s oře
 Čtrnáct v `StatFormatTests` pokrývá zkrácený zápis statistik: hranice tisíce, desetinu jen do
 deseti tisíc, zaokrouhlování vždy dolů a zástupný znak u neznámé hodnoty.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 54 testů prošlo.
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 117 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1600,8 +1672,10 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
 18. **Sbalení desek se nepamatuje.** Na nižším monitoru se sekce sbalí sama při každém
     startu, ruční volba se ale mezi spuštěními neukládá.
 19. **Jména spoluhráčů v Duos nejsou vždy k mání.** Log pojmenuje jen hráče, jejichž entita
-    se v něm objevila; ostatní zůstanou jako `Skrytý hráč`. Ve zkoumaném zápase šlo o dva
-    sloty z osmi. Deska spoluhráče v logu není vůbec, podokno u něj proto zůstane prázdné.
+    se v něm objevila; ostatní zůstanou jako `Skrytý hráč`. Vlastní spoluhráč jméno nedostane
+    nikdy, protože jeho hrdinu hra věší na entitu lokálního hráče. Jeho deska se ukládá jen
+    ze souboje, takže do jeho prvního souboje je podokno prázdné, a karta, kterou spoluhráč
+    předal, se v ruce od koupené karty nijak neliší.
 20. **Soukromí logů.** Vlastní archivy mohou obsahovat BattleTagy a další syrová data;
     nemají se automaticky sdílet bez kontroly.
 21. **Kresby a popisy karet potřebují internet.** Aplikace kvůli nim chodí na cizí servery

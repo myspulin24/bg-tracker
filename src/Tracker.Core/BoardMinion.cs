@@ -20,12 +20,22 @@ public sealed record BoardMinion(
     bool HasWindfury,
     int? Cost,
     int? ScriptDataNum1 = null,
-    int? ScriptDataNum2 = null)
+    int? ScriptDataNum2 = null,
+    bool IsTeammatePairCandidate = false,
+    bool IsTeammateTripleCandidate = false)
 {
     /// <summary>Statistiky ve tvaru <c>3/4</c>; pokud nejsou známé, vrací pomlčku.</summary>
     public string Stats => Attack is null && Health is null
         ? "—"
         : $"{Attack?.ToString() ?? "?"}/{Health?.ToString() ?? "?"}";
+
+    /// <summary>
+    /// Nápověda pro Duos: karta by spoluhráči složila pár nebo triple, tak jak to hra značí
+    /// ikonou na kartě v nabídce. Mimo Duos a u karet, kterých se to netýká, je prázdná.
+    /// </summary>
+    public string TeammateHint => IsTeammateTripleCandidate
+        ? "triple pro spoluhráče"
+        : IsTeammatePairCandidate ? "pár pro spoluhráče" : string.Empty;
 
     /// <summary>Klíčová slova celým jménem, například <c>Taunt · Divine Shield</c>.</summary>
     public string Keywords
@@ -59,7 +69,9 @@ public sealed record BoardMinion(
         entity.HasWindfury,
         entity.Cost,
         entity.ScriptDataNum1,
-        entity.ScriptDataNum2);
+        entity.ScriptDataNum2,
+        entity.IsTeammatePairCandidate,
+        entity.IsTeammateTripleCandidate);
 
     private static void Append(StringBuilder builder, bool present, string label)
     {

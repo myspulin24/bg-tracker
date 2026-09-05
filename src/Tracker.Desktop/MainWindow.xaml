@@ -207,6 +207,11 @@
                             </StackPanel>
                             <TextBlock Grid.Column="2" Text="{Binding Keywords}" Foreground="#7C8CA4" FontSize="9"
                                        Margin="6,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <!-- Duos: hra na kartě v nabídce značí, že by spoluhráči složila pár nebo
+                                 triple. Zelená jako řádek spoluhráče v lobby; mimo Duos se neukáže. -->
+                            <TextBlock Grid.Column="3" Text="{Binding TeammateHint}" Foreground="#7FD1A8" FontSize="9"
+                                       Margin="6,1,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding HasTeammateHint, Converter={StaticResource BoolToVisibility}}" />
                             <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="⚔" Foreground="#C8B27A" FontSize="9" Margin="0,0,3,0" VerticalAlignment="Center" />
@@ -539,7 +544,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="BoardsChevron" Text="▾" Style="{StaticResource SectionTitleStyle}"
                                                    Margin="0,0,6,0" />
-                                        <TextBlock x:Name="BoardsHeader" Grid.Column="1" Text="MOJE DESKA"
+                                        <TextBlock x:Name="BoardsHeader" Grid.Column="1" Text="{Binding PlayerBoardTitle}"
                                                    Style="{StaticResource SectionTitleStyle}" />
                                     </Grid>
                                 </Button>
