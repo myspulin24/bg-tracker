@@ -121,6 +121,12 @@ public sealed class TrackerSettings
     /// </summary>
     public string? HearthstoneDirectory { get; set; }
 
+    /// <summary>
+    /// Průvodce připojením se už jednou otevřel sám. Otevírá se při prvním spuštění, když hra
+    /// nemá zapnuté logování; potom už jen na přání, aby nepřekážel tomu, kdo ho odmítl.
+    /// </summary>
+    public bool SetupOffered { get; set; }
+
     /// <summary>Srovná hodnoty do povolených rozsahů. Vrací tentýž objekt, ať se dá volat v řetězu.</summary>
     public TrackerSettings Normalized()
     {

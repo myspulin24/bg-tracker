@@ -1018,7 +1018,28 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Pruhy, které se ukazují jen občas: aktualizace, načítání zápasu, hudba. -->
+                        <!-- Pruhy, které se ukazují jen občas: naslouchání, aktualizace, načítání zápasu, hudba. -->
+                        <Border BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,6"
+                                Visibility="{Binding IsListening, Converter={StaticResource BoolToVisibility}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSetupNeeded}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource Brush.NegativeSoft}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Warning}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding ListeningHint}" FontSize="10" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <Button Grid.Column="1" Content="Průvodce" Click="SetupButton_Click" Margin="8,0,0,0" Padding="8,3" FontSize="10"
+                                        ToolTip="Průvodce připojením: zkontroluje hru, logování i instalaci a opraví, co chybí." />
+                            </Grid>
+                        </Border>
                         <Border Background="{DynamicResource Brush.PositiveSoft}" BorderBrush="{DynamicResource Brush.Positive}" BorderThickness="1"
                                 CornerRadius="6" Padding="8,5" Margin="0,0,0,6"
                                 Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
@@ -1090,6 +1111,7 @@
                                     <Button.ContextMenu>
                                         <ContextMenu x:Name="ActionsMenu">
                                             <MenuItem Header="Vybrat log…" Tag="&#xE8E5;" Click="SelectLogButton_Click" />
+                                            <MenuItem Header="Průvodce připojením…" Tag="&#xE71B;" Click="SetupButton_Click" />
                                             <MenuItem Header="Spustit demo" Tag="&#xE768;" Click="DemoButton_Click" />
                                             <MenuItem Header="{Binding PauseButtonText}" Tag="&#xE769;" IsEnabled="{Binding IsPauseEnabled}" Click="PauseButton_Click" />
                                             <Separator />

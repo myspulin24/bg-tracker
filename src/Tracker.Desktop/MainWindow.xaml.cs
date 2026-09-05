@@ -36,6 +36,9 @@ public partial class MainWindow : Window
     /// <summary>Jak často se v živém režimu ověří, jestli hra nezaložila nový session log.</summary>
     private const int LiveDiscoveryIntervalTicks = 15;
 
+    /// <summary>Jak často se při naslouchání přepočítá diagnostika pro pruh s průvodcem.</summary>
+    private const int ListeningRefreshTicks = 5;
+
     private readonly UserSettings settings;
     private readonly MatchHistory history;
     private readonly MainViewModel viewModel;
@@ -524,8 +527,32 @@ public partial class MainWindow : Window
             else
             {
                 StartListening();
+                OfferSetupOnce();
             }
         }
+
+        // Pro podporu na dálku: „spusť tracker s --setup“ otevře průvodce bez hledání v menu.
+        if (Environment.GetCommandLineArgs().Skip(1).Any(argument => argument.Equals("--setup", StringComparison.OrdinalIgnoreCase)))
+        {
+            SetupWindow.Open(this, settings);
+        }
+    }
+
+    /// <summary>
+    /// Při prvním spuštění, kdy hra nemá zapnuté logování, se průvodce otevře sám; jinak by
+    /// nový uživatel viděl jen NASLOUCHÁM a nevěděl, že je potřeba něco udělat. Podruhé už ne,
+    /// pruh s tlačítkem v overlayi zůstává.
+    /// </summary>
+    private void OfferSetupOnce()
+    {
+        if (settings.Model.SetupOffered || !viewModel.IsSetupNeeded)
+        {
+            return;
+        }
+
+        settings.Model.SetupOffered = true;
+        SaveSettings();
+        SetupWindow.Open(this, settings);
     }
 
     /// <summary>Hledá log i v instalaci zadané v nastavení, pokud je; jinak jen na obvyklých místech.</summary>
@@ -582,6 +609,14 @@ public partial class MainWindow : Window
 
         if (mode == TrackerMode.Listening)
         {
+            // Hra mohla mezitím naběhnout nebo uživatel opravil log.config; pruh to má ukázat
+            // bez čekání na další start trackeru.
+            if (++ticksSinceDiscovery >= ListeningRefreshTicks)
+            {
+                ticksSinceDiscovery = 0;
+                RefreshListeningState();
+            }
+
             return;
         }
 
@@ -747,6 +782,7 @@ public partial class MainWindow : Window
         viewModel.IsLoading = false;
         viewModel.Update(tracker.State);
         viewModel.ModeLabel = "ZÁZNAM";
+        viewModel.IsListening = false;
         viewModel.SourceDescription = MatchLabel(path);
         viewModel.SourceTooltip = $"{path}{Environment.NewLine}{lines:N0} řádků";
     }
@@ -795,6 +831,7 @@ public partial class MainWindow : Window
         ticksSinceDiscovery = 0;
         demoIndex = 0;
         viewModel.ModeLabel = "ŽIVĚ";
+        viewModel.IsListening = false;
         viewModel.SourceDescription = Path.GetFileName(path);
         viewModel.SourceTooltip = path;
         viewModel.PauseButtonText = "Pozastavit";
@@ -831,6 +868,7 @@ public partial class MainWindow : Window
         demoIndex = 0;
         viewModel.Update(tracker.State);
         viewModel.ModeLabel = "DEMO";
+        viewModel.IsListening = false;
         viewModel.SourceDescription = "syntetická data";
         viewModel.SourceTooltip = "Vestavěná ukázka bez běžící hry.";
         viewModel.PauseButtonText = "Pozastavit";
@@ -849,71 +887,92 @@ public partial class MainWindow : Window
         liveReader = null;
         mode = TrackerMode.Listening;
         demoIndex = 0;
+        ticksSinceDiscovery = 0;
         viewModel.Update(tracker.State);
         viewModel.ModeLabel = "NASLOUCHÁM";
         viewModel.SourceDescription = "čekám na nový Power.log";
-        viewModel.SourceTooltip = ListeningDiagnosis();
+        viewModel.IsListening = true;
         viewModel.PauseButtonText = "Pozastavit";
         viewModel.IsPauseEnabled = false;
+        RefreshListeningState();
         timer.Interval = TimeSpan.FromSeconds(1);
         timer.Start();
     }
 
     /// <summary>
-    /// Když se log nenajde, stav „čekám na nový Power.log“ vypadá stejně, ať chybí logování ve
-    /// hře, hra neběží, nebo je nainstalovaná mimo prohledávané cesty. Tooltip proto vypíše,
-    /// co se ověřilo a kde se hledalo, aby to uživatel poznal bez ptaní.
+    /// Stav „čekám na nový Power.log“ vypadá stejně, ať chybí logování ve hře, hra neběží, nebo
+    /// je nainstalovaná mimo prohledávané cesty. Pruh v overlayi proto řekne jednou větou, na
+    /// co se čeká, a tooltip zdroje vypíše, co všechno se ověřilo.
     /// </summary>
-    private string ListeningDiagnosis()
+    private void RefreshListeningState()
+    {
+        var report = SetupDiagnostics.Collect(settings.Model.HearthstoneDirectory, DateTimeOffset.UtcNow);
+        viewModel.IsSetupNeeded = !report.IsReady;
+        viewModel.ListeningHint = ListeningHint(report);
+        viewModel.SourceTooltip = ListeningDiagnosis(report);
+    }
+
+    private static string ListeningHint(SetupReport report)
+    {
+        if (!report.LogConfig.IsReady)
+        {
+            return "Hra nemá zapnuté logování, Power.log nevzniká. Průvodce to opraví jedním kliknutím.";
+        }
+
+        if (!report.InstallFound)
+        {
+            return "Instalaci Hearthstonu jsem nenašel. Ukažte mi ji v průvodci.";
+        }
+
+        if (!report.Game.IsRunning)
+        {
+            return "Hearthstone neběží. Připojím se sám, až ho spustíte.";
+        }
+
+        return report.Game.IsInaccessible
+            ? "Hearthstone běží jako správce. Připojím se, jakmile začne psát log."
+            : "Hearthstone běží. Připojím se s prvním zápasem.";
+    }
+
+    private static string ListeningDiagnosis(SetupReport report)
     {
         var lines = new List<string> { "Power.log aktuální relace hry jsem nenašel." };
 
-        try
+        lines.Add(report.Game switch
         {
-            lines.Add(Process.GetProcessesByName("Hearthstone").Length > 0
-                ? "• Hearthstone běží."
-                : "• Hearthstone neběží. Tracker se připojí, až ho spustíte.");
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            lines.Add("• Jestli Hearthstone běží, se nedá zjistit. Běží hra jako správce?");
-        }
+            { IsRunning: false } => "• Hearthstone neběží. Tracker se připojí, až ho spustíte.",
+            { IsInaccessible: true } => "• Hearthstone běží jako správce; log se pozná podle času zápisu.",
+            _ => "• Hearthstone běží."
+        });
 
-        var config = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Blizzard", "Hearthstone", "log.config");
-        try
+        lines.Add(report.LogConfig switch
         {
-            lines.Add(File.Exists(config) &&
-                      File.ReadAllText(config).Contains("[Power]", StringComparison.OrdinalIgnoreCase)
-                ? "• log.config má sekci [Power]."
-                : $"• V {config} chybí sekce [Power]. Bez ní hra Power.log vůbec nepíše; po doplnění restartujte hru.");
-        }
-        catch (IOException)
-        {
-            lines.Add($"• {config} se nepodařilo přečíst.");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            lines.Add($"• K {config} nejsou práva.");
-        }
+            { IsReady: true } => "• log.config má sekci [Power].",
+            { HasSection: true } => $"• Sekce [Power] v {report.LogConfigPath} je neúplná; průvodce ji opraví.",
+            _ => $"• V {report.LogConfigPath} chybí sekce [Power]. Bez ní hra Power.log vůbec nepíše; po doplnění restartujte hru."
+        });
 
-        var roots = PowerLogDiscovery.InstallRoots();
-        var withLogs = roots.Where(root => Directory.Exists(Path.Combine(root, "Logs"))).ToArray();
-        lines.Add(withLogs.Length > 0
-            ? "• Adresář Logs jsem našel v: " + string.Join(", ", withLogs)
-            : $"• Ani v jedné z {roots.Count} prohledaných instalací není adresář Logs.");
+        lines.Add(report.InstallRoots.Count > 0
+            ? "• Adresář Logs jsem našel v: " + string.Join(", ", report.InstallRoots)
+            : "• V žádné z prohledaných instalací není adresář Logs.");
 
-        if (settings.Model.HearthstoneDirectory is { } custom)
+        if (report.CustomDirectory is { } custom)
         {
-            lines.Add(Directory.Exists(Path.Combine(custom, "Logs"))
+            lines.Add(report.CustomDirectoryHasLogs
                 ? $"• Instalace z nastavení: {custom}."
                 : $"• Instalace z nastavení {custom} nemá adresář Logs.");
         }
 
-        lines.Add("• Vlastní cestu k logu lze vybrat v menu tlačítkem Vybrat log, instalaci hry v nastavení.");
+        if (report.LatestPowerLog is { } latest)
+        {
+            lines.Add($"• Poslední Power.log: {latest} (zapsán {report.LatestPowerLogWritten?.ToLocalTime():g}), ale nepatří běžící hře.");
+        }
+
+        lines.Add("• Průvodce připojením je v menu i v nastavení; vlastní cestu k logu lze vybrat tlačítkem Vybrat log.");
         return string.Join(Environment.NewLine, lines);
     }
+
+    private void SetupButton_Click(object sender, RoutedEventArgs eventArgs) => SetupWindow.Open(this, settings);
 
     private bool HandleLine(string line) => tracker.Apply(parser.Parse(line));
 
@@ -955,28 +1014,12 @@ public partial class MainWindow : Window
         base.OnClosed(eventArgs);
     }
 
-    private static bool IsCurrentSessionLog(string path)
-    {
-        try
-        {
-            var gameProcesses = Process.GetProcessesByName("Hearthstone");
-            if (gameProcesses.Length == 0)
-            {
-                return false;
-            }
-
-            var earliestStart = gameProcesses.Min(process => process.StartTime.ToUniversalTime());
-            return File.GetLastWriteTimeUtc(path) >= earliestStart.AddMinutes(-1);
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return false;
-        }
-    }
+    /// <summary>
+    /// Log patří běžící hře. Když hra běží jako správce a tracker ne, Windows start procesu
+    /// neprozradí; pak rozhoduje, jestli do logu hra nedávno psala (viz <see cref="SetupDiagnostics"/>).
+    /// </summary>
+    private static bool IsCurrentSessionLog(string path) =>
+        SetupDiagnostics.IsCurrentSessionLog(path, DateTimeOffset.UtcNow);
 
     private void DragArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs eventArgs)
     {

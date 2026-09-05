@@ -85,4 +85,7 @@ public partial class SettingsWindow : Window
 
     private void ClearDirectoryButton_Click(object sender, RoutedEventArgs eventArgs) =>
         settings.HearthstoneDirectory = string.Empty;
+
+    /// <summary>Průvodce patří k hlavnímu oknu, aby přežil zavření nastavení.</summary>
+    private void SetupButton_Click(object sender, RoutedEventArgs eventArgs) => SetupWindow.Open(Owner ?? this, settings);
 }

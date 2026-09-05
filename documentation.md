@@ -103,20 +103,31 @@ nový `GameStateTracker`, aby se metadata z různých relací nesmíchala.
 
 ### 5.1 Zapnutí logování ve hře
 
-Pokud Hearthstone `Power.log` nevytváří, musí být v souboru
-`%LOCALAPPDATA%\Blizzard\Hearthstone\log.config` aktivní sekce:
+Hearthstone píše `Power.log` jen tehdy, když to má povolené v souboru
+`%LOCALAPPDATA%\Blizzard\Hearthstone\log.config`. Bez sekce `[Power]` log vůbec nevzniká
+a tracker zůstane trvale v režimu NASLOUCHÁM; to je nejčastější příčina, proč „to na jiném
+počítači nefunguje“. Potřebná sekce:
 
 ```ini
 [Power]
 LogLevel=1
-FilePrinting=true
-ConsolePrinting=false
-ScreenPrinting=false
-Verbose=true
+FilePrinting=True
+ConsolePrinting=False
+ScreenPrinting=False
+Verbose=True
 ```
 
-Hearthstone je po změně vhodné ukončit a znovu spustit. Před úpravou existujícího
-`log.config` je vhodné vytvořit zálohu a zachovat ostatní sekce.
+Nejjednodušší cesta je **Průvodce připojením** (kapitola 11.8): tlačítko **Zapnout logování**
+volá `HearthstoneLogConfig.Apply` z Core. To soubor přečte, doplní nebo opraví jen sekci
+`[Power]`, ostatní sekce i cizí klíče v ní nechá být, původní obsah uloží jako
+`log.config.bak` a zapíše bez BOM se stejnými konci řádků, jaké soubor měl. Nad hotovým
+souborem nic nezapíše, takže se dá volat opakovaně. `HearthstoneLogConfig.Inspect` říká,
+jestli sekce existuje a má `FilePrinting=True`, `LogLevel=1` a `Verbose=True`; bez nich by
+byl log prázdný nebo bez tagů entit, které parser potřebuje.
+
+Hra čte `log.config` jen při startu. Po změně je nutné Hearthstone vypnout a znovu spustit;
+průvodce na to upozorní, když zjistí, že se soubor změnil až po startu běžící hry. Ruční
+úprava podle výpisu výše funguje stejně.
 
 ### 5.1b Okno musí zůstat v dosahu
 
@@ -168,14 +179,29 @@ Hledá se výhradně jméno `Power.log`. Po ukončení hry Hearthstone soubor p�
 lze prohlédnout přes **Vybrat log**, nebo bezpečněji konzolovým `--replay`, který nic
 nezapisuje.
 
-Když se log nenajde, tooltip u stavu vypíše, co se ověřilo: jestli běží hra, jestli má
-`log.config` sekci `[Power]` a ve kterých instalacích se našel adresář `Logs`. Bez toho
-vypadá chybějící logování, vypnutá hra i instalace mimo prohledávané cesty stejně.
+Když se log nenajde, pruh v overlayi řekne jednou větou, na co tracker čeká, a tooltip
+u stavu vypíše, co se ověřilo: jestli běží hra, jestli má `log.config` sekci `[Power]`, ve
+kterých instalacích se našel adresář `Logs` a jaký je poslední nalezený log. Bez toho vypadá
+chybějící logování, vypnutá hra i instalace mimo prohledávané cesty stejně. Obojí počítá
+`SetupDiagnostics.Collect` v Core, stejná diagnostika, nad kterou stojí průvodce připojením
+(kapitola 11.8).
 
-Desktop navíc považuje automaticky nalezený log za aktuální pouze tehdy, když běží
-proces `Hearthstone` a čas posledního zápisu logu není starší než přibližně jednu minutu
-před startem nejstaršího nalezeného procesu hry. Tím se omezuje automatické načítání
-starých session logů.
+Průvodce má navíc tlačítko **Prohledat disky**: `PowerLogDiscovery.ScanDrives` projde všechny
+pevné disky do třetí úrovně složek a hledá `Hearthstone.exe`, takže najde i instalaci ve
+vlastní složce typu `D:\Hry\Blizzard\Hearthstone`, na kterou seznam obvyklých cest nesáhne.
+Přeskakuje `Windows`, složky začínající na `$` (koš), `System Volume Information` a body
+spojení, aby se nezacyklil; nepřístupné složky tiše vynechá. Do pravidelného hledání nepatří,
+protože prochází disk. Nalezená složka (při více nálezech ta s adresářem `Logs`) se uloží do
+nastavení jako instalace hry a dál se prohledává spolu s obvyklými místy.
+
+Desktop považuje automaticky nalezený log za aktuální pouze tehdy, když běží proces
+`Hearthstone` a log byl zapsaný nejdřív minutu před startem nejstaršího nalezeného procesu
+hry (`SetupDiagnostics.IsCurrentSessionLog`). Tím se omezuje automatické načítání starých
+session logů. Když hra běží jako správce a tracker ne, Windows start jejího procesu
+neprozradí (`Process.StartTime` skončí `Win32Exception`); dřív to znamenalo, že žádný log
+není aktuální a tracker zůstal navždy v naslouchání. Teď se v takovém případě bere log, do
+kterého hra psala v posledních deseti minutách. Průvodce tento stav ukáže a nabídne
+**Spustit tracker jako správce**, kdyby ani to nestačilo.
 
 ### 5.3 Režimy desktopové aplikace
 
@@ -193,8 +219,9 @@ Desktop má tři interní režimy:
 
 Při startu má přednost explicitní argument `--log`, potom aktuální automaticky nalezený
 log a nakonec režim naslouchání. Od 0.10.1 se explicitní log čte **živě jen tehdy, když
-patří běžící hře** (`IsCurrentSessionLog`, tedy poslední zápis je novější než start procesu
-Hearthstone mínus minuta); jinak se přehraje. Bez toho zakládal každý spuštěný `--log` nový
+patří běžící hře** (`SetupDiagnostics.IsCurrentSessionLog`, tedy poslední zápis je novější
+než start procesu Hearthstone mínus minuta; u hry spuštěné jako správce, jejíž start se
+přečíst nedá, stačí zápis v posledních deseti minutách, viz 5.2); jinak se přehraje. Bez toho zakládal každý spuštěný `--log` nový
 záznam v archivu zápasů a přepsal checkpoint, takže retence na pěti zápasech vytlačila
 skutečně odehrané hry. Přehrávání do `%LOCALAPPDATA%` nezapisuje vůbec nic.
 V současné implementaci má automaticky zjištěná živá
@@ -1020,7 +1047,8 @@ Pod hlavičkou jdou sekce nad sebou; každá se dá v nastavení vypnout a vět�
 6. **Události** – dvě až šest posledních událostí.
 7. **Historie** – poslední zápasy zvoleného režimu s hrdinou, umístěním, změnou MMR
    a zůstatkem MMR, přepínač sólo/Duos a štítek s aktuálním MMR (11.3c).
-8. Pruhy, které se ukazují jen občas: aktualizace, načítání zápasu a hudba (11.3b).
+8. Pruhy, které se ukazují jen občas: naslouchání s tlačítkem průvodce připojením (11.8),
+   aktualizace, načítání zápasu a hudba (11.3b).
 9. **Patička** – stav a výsledek, po najetí diagnostika parseru; vpravo patch notes a menu
    s ovládáním.
 
@@ -1392,6 +1420,34 @@ barvu v `Tag` jako text; v šabloně ji na štětec převede obyčejná vazba, p
 `TemplateBinding` typ nepřevádí a vzorek by zůstal prázdný. Instalaci hry vybírá
 `OpenFolderDialog` z .NET 8.
 
+### 11.8 Průvodce připojením
+
+Když tracker zůstává v režimu NASLOUCHÁM, ukazuje se pod historií pruh s jednou větou, na co
+čeká, a tlačítkem **Průvodce**. Věta vychází ze `SetupDiagnostics.Collect` v Core a přepočítává
+se každých pět sekund: hra neběží, hra běží a čeká se na první zápas, hra běží jako správce,
+chybí logování ve hře, nenašla se instalace. V posledních dvou případech se pruh zbarví
+varovně (`IsSetupNeeded`), protože bez zásahu uživatele se tracker nepřipojí nikdy. Průvodce
+je také v menu patičky a na stránce Data v nastavení, argument `--setup` ho otevře hned po
+startu (hodí se pro podporu na dálku) a při prvním spuštění, kdy hra nemá zapnuté logování,
+se otevře sám. To si tracker pamatuje v `SetupOffered` v nastavení, aby podruhé už jen čekal
+s pruhem a nepřekážel tomu, kdo průvodce odmítl.
+
+Okno `SetupWindow` má stejný chrome jako nastavení. Nahoře je souhrn jednou větou (připojí se
+sám, nebo je co dělat) a pod ním čtyři kroky se stavovou ikonou (fajfka, hodiny, vykřičník,
+křížek) a tlačítky:
+
+| krok | co se kontroluje | co s tím |
+| --- | --- | --- |
+| Hra Hearthstone | běží proces a jde přečíst jeho start | **Spustit tracker jako správce**, když hra běží jako správce a start se přečíst nedá; tracker se přes UAC spustí znovu a původní se zavře |
+| Logování ve hře | `log.config` existuje a sekce `[Power]` je úplná | **Zapnout logování** (5.1), **Otevřít soubor** v Poznámkovém bloku; varování, že hra načítá soubor jen při startu, když se změnil po jejím spuštění |
+| Složka s hrou | aspoň jedna instalace s adresářem `Logs`, včetně složky z nastavení | **Prohledat disky** (5.2) na pozadí, **Vybrat složku…**; obojí zapíše `HearthstoneDirectory` do nastavení |
+| Power.log běžící hry | nejnovější nalezený log a jestli patří běžící hře | jen vysvětlení: zápas ještě nezačal, log je z minulé relace, nebo hra načetla `log.config` ještě bez sekce `[Power]` |
+
+Kontrola se opakuje každé dvě sekundy, takže výsledek opravy i start hry jsou vidět hned,
+a tlačítko **Znovu zkontrolovat** ji vyvolá ručně. Průvodce nečte paměť hry a mimo
+`log.config` a `settings.json` nic nezapisuje; `SetupDiagnostics` je čisté čtení, opravy dělají
+jen tlačítka.
+
 ## 12. Konzolová aplikace
 
 Konzolový projekt je možné použít pro diagnostiku a jednoduchý replay:
@@ -1613,7 +1669,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje sto dvacet devět testů.
+Test suite aktuálně obsahuje sto třicet pět testů.
 
 Původní čtyři:
 
@@ -1692,7 +1748,14 @@ obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s oře
 Čtrnáct v `StatFormatTests` pokrývá zkrácený zápis statistik: hranice tisíce, desetinu jen do
 deseti tisíc, zaokrouhlování vždy dolů a zástupný znak u neznámé hodnoty.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 129 testů prošlo.
+Šest v `SetupTests` pokrývá průvodce připojením: rozpoznání sekce `[Power]` bez ohledu na
+velikost písmen, doplnění sekce do souboru s jinými sekcemi beze změny jejich obsahu
+a idempotence opravy, opravu neúplné sekce na místě se zachováním cizích klíčů, zápis na disk
+se zálohou a bez zbytečného přepisu hotového souboru, hledání `Hearthstone.exe` do zadané
+hloubky s přeskočením koše, a přijetí čerstvého logu za aktuální, když hra běží jako správce
+a start jejího procesu není znát.
+
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 135 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1816,11 +1879,19 @@ Doporučené pořadí dalšího vývoje:
 
 ### Aplikace zůstává v režimu NASLOUCHÁM
 
-- ověřit, že běží proces `Hearthstone`;
-- ověřit konfiguraci `log.config`;
-- najít nejnovější session adresář `Hearthstone_*` a zkontrolovat, že `Power.log` roste;
-- použít **Vybrat log** nebo argument `--log`;
-- není nutné spouštět aplikaci jako správce.
+- otevřít **Průvodce připojením** (tlačítko v pruhu pod historií, menu patičky, nastavení →
+  Data, nebo spustit tracker s argumentem `--setup`); ukáže, který ze čtyř kroků nesedí,
+  a opraví ho (kapitola 11.8);
+- nejčastější příčina: v `%LOCALAPPDATA%\Blizzard\Hearthstone\log.config` chybí sekce
+  `[Power]`, hra pak `Power.log` vůbec nepíše; **Zapnout logování** ji doplní a původní soubor
+  zálohuje jako `log.config.bak`; potom je nutné hru vypnout a znovu spustit;
+- instalace mimo obvyklé cesty (třeba `D:\Hry\Hearthstone`): **Prohledat disky** nebo
+  **Vybrat složku…**; složka se uloží do nastavení;
+- hra spuštěná jako správce: tracker pozná log podle času zápisu (do deseti minut); když se
+  přesto nepřipojí, **Spustit tracker jako správce**; jinak správcovská práva nejsou potřeba;
+- `Power.log` vzniká až s prvním zápasem; v menu hry se tracker ještě nepřipojí;
+- nouzově najít nejnovější session adresář `Hearthstone_*`, zkontrolovat, že `Power.log`
+  roste, a použít **Vybrat log** nebo argument `--log`.
 
 ### Lobby ukazuje méně než osm hráčů
 

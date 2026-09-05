@@ -1,0 +1,175 @@
+<Window x:Class="Tracker.Desktop.SetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Průvodce připojením" Icon="Assets/bg-tracker.ico"
+        Width="620" Height="560" MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="CanResize"
+        Background="{DynamicResource Brush.Window}" Topmost="True" ShowInTaskbar="False"
+        FontFamily="{StaticResource Font.Body}">
+    <!-- Stejný chrome jako okno nastavení: nativní tažení a změna velikosti ze všech stran. -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
+                            GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <!-- Klíčové styly staví na implicitním stylu TextBlocku, jinak by text zůstal černý. -->
+        <Style x:Key="StepTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="StepDetailStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text2}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+        <!-- Stavová ikona kroku: barvu jí dává kód podle výsledku kontroly. -->
+        <Style x:Key="StepGlyphStyle" TargetType="TextBlock" BasedOn="{StaticResource GlyphStyle}">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,1,10,0" />
+            <Setter Property="Width" Value="20" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="StepStyle" TargetType="Border" BasedOn="{StaticResource SurfaceStyle}">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+        <Style x:Key="StepButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="MinWidth" Value="150" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource Brush.Window}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{DynamicResource Brush.Header}" BorderBrush="{DynamicResource Brush.Divider}" BorderThickness="0,0,0,1">
+                <Grid Margin="14,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE71B;" Style="{StaticResource GlyphStyle}" FontSize="14" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,9,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Průvodce připojením" FontSize="12.5" FontWeight="Bold" FontFamily="{StaticResource Font.Display}" />
+                        <TextBlock Text="Zjistí, proč tracker nevidí hru, a opraví to." FontSize="9.5" Foreground="{DynamicResource Brush.Text2}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" shell:WindowChrome.IsHitTestVisibleInChrome="True" Style="{StaticResource CloseButtonStyle}"
+                            Width="30" Height="28" Click="CloseButton_Click" ToolTip="Zavřít">
+                        <TextBlock Text="&#xE8BB;" Style="{StaticResource GlyphStyle}" FontSize="10" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="14,12,14,4">
+                <StackPanel>
+                    <!-- Souhrn nahoře: jednou větou, jestli se tracker připojí sám, nebo je co dělat. -->
+                    <Border x:Name="SummaryBorder" BorderThickness="1" CornerRadius="8" Padding="12,9" Margin="0,0,0,12"
+                            Background="{DynamicResource Brush.AccentSoft}" BorderBrush="{DynamicResource Brush.AccentBorder}">
+                        <StackPanel>
+                            <TextBlock x:Name="SummaryText" FontSize="11.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="SummaryHint" FontSize="9.5" Foreground="{DynamicResource Brush.Text2}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 1. Hra -->
+                    <Border Style="{StaticResource StepStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="GameGlyph" Style="{StaticResource StepGlyphStyle}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="1. Hra Hearthstone" Style="{StaticResource StepTitleStyle}" />
+                                <TextBlock x:Name="GameDetail" Style="{StaticResource StepDetailStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Top">
+                                <Button x:Name="ElevateButton" Content="Spustit tracker jako správce" Style="{StaticResource StepButtonStyle}"
+                                        Click="ElevateButton_Click" Visibility="Collapsed"
+                                        ToolTip="Zavře tracker a spustí ho znovu s právy správce, aby viděl proces hry spuštěné jako správce." />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 2. Logování -->
+                    <Border Style="{StaticResource StepStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ConfigGlyph" Style="{StaticResource StepGlyphStyle}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="2. Logování ve hře (log.config)" Style="{StaticResource StepTitleStyle}" />
+                                <TextBlock x:Name="ConfigDetail" Style="{StaticResource StepDetailStyle}" />
+                                <TextBlock x:Name="ConfigNote" Style="{StaticResource StepDetailStyle}" Foreground="{DynamicResource Brush.Warning}"
+                                           FontWeight="SemiBold" Visibility="Collapsed" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Top">
+                                <Button x:Name="FixConfigButton" Content="Zapnout logování" Style="{StaticResource AccentButtonStyle}"
+                                        Padding="10,4" Margin="0,0,0,6" MinWidth="150" Click="FixConfigButton_Click"
+                                        ToolTip="Doplní do log.config sekci [Power]. Ostatní obsah zůstane, původní soubor se zálohuje jako log.config.bak." />
+                                <Button x:Name="OpenConfigButton" Content="Otevřít soubor" Style="{StaticResource StepButtonStyle}" Click="OpenConfigButton_Click" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 3. Instalace -->
+                    <Border Style="{StaticResource StepStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="InstallGlyph" Style="{StaticResource StepGlyphStyle}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="3. Složka s hrou" Style="{StaticResource StepTitleStyle}" />
+                                <TextBlock x:Name="InstallDetail" Style="{StaticResource StepDetailStyle}" />
+                                <TextBlock x:Name="ScanDetail" Style="{StaticResource StepDetailStyle}" Visibility="Collapsed" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Top">
+                                <Button x:Name="ScanButton" Content="Prohledat disky" Style="{StaticResource StepButtonStyle}" Click="ScanButton_Click"
+                                        ToolTip="Projde všechny pevné disky do třetí úrovně složek a hledá Hearthstone.exe. Může to chvíli trvat." />
+                                <Button Content="Vybrat složku…" Style="{StaticResource StepButtonStyle}" Click="BrowseButton_Click"
+                                        ToolTip="Složka, ve které je Hearthstone.exe a adresář Logs. Uloží se do nastavení." />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 4. Power.log -->
+                    <Border Style="{StaticResource StepStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LogGlyph" Style="{StaticResource StepGlyphStyle}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="4. Power.log běžící hry" Style="{StaticResource StepTitleStyle}" />
+                                <TextBlock x:Name="LogDetail" Style="{StaticResource StepDetailStyle}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Text="Tracker nečte paměť hry ani nic neposílá; potřebuje jen textový log, který si hra píše sama. Kontrola se opakuje každé dvě sekundy, takže změny uvidíte hned."
+                               Style="{StaticResource StepDetailStyle}" Foreground="{DynamicResource Brush.Text3}" Margin="2,2,2,6" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Divider}" BorderThickness="0,1,0,0" Padding="14,10">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="CheckedText" FontSize="9.5" Foreground="{DynamicResource Brush.Text3}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="1" Content="Znovu zkontrolovat" Click="RefreshButton_Click" Margin="10,0,0,0" />
+                    <Button Grid.Column="2" Content="Zavřít" Style="{StaticResource AccentButtonStyle}" Click="CloseButton_Click" Margin="8,0,0,0" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

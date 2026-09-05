@@ -59,6 +59,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private double loadProgress;
     private string loadStatus = string.Empty;
     private string sourceTooltip = string.Empty;
+    private bool isListening;
+    private bool isSetupNeeded;
+    private string listeningHint = string.Empty;
 
     /// <summary>Bonus, který v této hře ještě nenastal.</summary>
     private const string EmptyBonus = "+0/+0";
@@ -250,6 +253,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Plná cesta ke zdroji; v hlavičce se vejde jen zkrácený popis.</summary>
     public string SourceTooltip { get => sourceTooltip; set => Set(ref sourceTooltip, value); }
+
+    /// <summary>Tracker čeká na log běžící hry; po tu dobu je vidět pruh s průvodcem připojením.</summary>
+    public bool IsListening { get => isListening; set => Set(ref isListening, value); }
+
+    /// <summary>
+    /// Čekání nemá jak skončit: hra nepíše log nebo se nenašla instalace. Pruh se pak zbarví
+    /// varovně, protože bez zásahu uživatele se tracker nepřipojí nikdy.
+    /// </summary>
+    public bool IsSetupNeeded { get => isSetupNeeded; set => Set(ref isSetupNeeded, value); }
+
+    /// <summary>Jedna věta o tom, na co tracker čeká a co s tím.</summary>
+    public string ListeningHint { get => listeningHint; set => Set(ref listeningHint, value); }
 
     /// <summary>Název skladby, u videa v prohlížeči jeho titulek.</summary>
     public string MediaTitle { get => mediaTitle; private set => Set(ref mediaTitle, value); }

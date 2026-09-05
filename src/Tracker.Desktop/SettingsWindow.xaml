@@ -391,6 +391,16 @@
                             <Grid Style="{StaticResource RowStyle}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Průvodce připojením" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Když tracker zůstává v režimu NASLOUCHÁM: zkontroluje, zda hra běží, zda má zapnuté logování (log.config) a kde je nainstalovaná. Co chybí, opraví jedním kliknutím."
+                                               Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Otevřít průvodce…" Padding="10,4" VerticalAlignment="Center" Click="SetupButton_Click" />
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
                                     <TextBlock Text="Uložené zápasy k přehrání" Style="{StaticResource RowLabelStyle}" />
                                     <TextBlock Text="Kolik dohraných zápasů zůstává v archivu pro Vybrat log. Zabalený zápas má zhruba 2 až 3 MB; starší se mažou při dalším dohraném zápase. Historie zápasů na tom nezávisí." Style="{StaticResource RowHintStyle}" />
                                 </StackPanel>

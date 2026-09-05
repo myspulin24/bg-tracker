@@ -67,6 +67,85 @@ public static class PowerLogDiscovery
     }
 
     /// <summary>
+    /// Hlubší hledání pro průvodce připojením: projde všechny pevné disky do zadané hloubky
+    /// a vrátí složky, ve kterých leží <c>Hearthstone.exe</c>. Najde i instalaci ve vlastní
+    /// složce typu <c>D:\Hry\Hearthstone</c>, na kterou obvyklé cesty nesáhnou. Do pravidelného
+    /// hledání nepatří, protože prochází disk; volá se jen na přání uživatele.
+    /// </summary>
+    public static IReadOnlyList<string> ScanDrives(int maxDepth = 2)
+    {
+        var found = new List<string>();
+        foreach (var drive in FixedDrives())
+        {
+            found.AddRange(FindInstallsUnder(drive, maxDepth));
+        }
+
+        return [.. found.Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    /// <summary>Složky pod daným kořenem, do zadané hloubky, které obsahují <c>Hearthstone.exe</c>.</summary>
+    public static IReadOnlyList<string> FindInstallsUnder(string root, int maxDepth)
+    {
+        var found = new List<string>();
+        Walk(root, 0);
+        return found;
+
+        void Walk(string directory, int depth)
+        {
+            if (File.Exists(Path.Combine(directory, "Hearthstone.exe")))
+            {
+                found.Add(directory);
+                return;
+            }
+
+            if (depth >= maxDepth)
+            {
+                return;
+            }
+
+            string[] children;
+            try
+            {
+                children = Directory.GetDirectories(directory);
+            }
+            catch (Exception exception) when (IsSkippable(exception))
+            {
+                // Chráněné nebo mizející složky se přeskočí; hra v nich není.
+                return;
+            }
+
+            foreach (var child in children)
+            {
+                var name = Path.GetFileName(child);
+                if (name.StartsWith('$') ||
+                    name.Equals("Windows", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    // Symbolické odkazy a spojení by mohly vést do smyčky nebo na jiný disk.
+                    if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        continue;
+                    }
+                }
+                catch (Exception exception) when (IsSkippable(exception))
+                {
+                    continue;
+                }
+
+                Walk(child, depth + 1);
+            }
+        }
+
+        static bool IsSkippable(Exception exception) =>
+            exception is IOException or UnauthorizedAccessException or System.Security.SecurityException;
+    }
+
+    /// <summary>
     /// Nejnovější <c>Power.log</c> v zadaných instalacích. Oddělené od <see cref="InstallRoots"/>,
     /// aby se dalo testovat bez skutečné instalace hry.
     /// </summary>

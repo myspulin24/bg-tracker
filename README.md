@@ -136,21 +136,28 @@ dotnet run --project src/Tracker.App -- --replay --log ".\Power.log"
 
 ## Zapnutí Power.log
 
-Pokud Hearthstone `Power.log` nevytváří, ukončete hru a vytvořte nebo doplňte
-soubor `%LOCALAPPDATA%\Blizzard\Hearthstone\log.config`:
+Hearthstone píše `Power.log` jen se sekcí `[Power]` v souboru
+`%LOCALAPPDATA%\Blizzard\Hearthstone\log.config`. Bez ní tracker zůstane v režimu
+NASLOUCHÁM. Nejjednodušší je v trackeru otevřít **Průvodce připojením** (tlačítko v pruhu
+pod historií, menu patičky, nastavení → Data, nebo spuštění s `--setup`) a kliknout na
+**Zapnout logování**: sekce se doplní, ostatní obsah zůstane a původní soubor se zálohuje
+jako `log.config.bak`. Potom Hearthstone vypněte a znovu spusťte. Průvodce také najde
+instalaci na jiném disku (**Prohledat disky**, **Vybrat složku…**) a poradí, když hra běží
+jako správce.
+
+Ručně: ukončete hru a do `log.config` doplňte
 
 ```ini
 [Power]
 LogLevel=1
-FilePrinting=true
-ConsolePrinting=false
-ScreenPrinting=false
-Verbose=true
+FilePrinting=True
+ConsolePrinting=False
+ScreenPrinting=False
+Verbose=True
 ```
 
-Potom Hearthstone znovu spusťte. Umístění logu závisí na instalaci; často je v
-adresáři `Logs` uvnitř instalace Hearthstonu. Existující `log.config` před změnou
-zálohujte a zachovejte jeho ostatní sekce.
+Potom Hearthstone znovu spusťte. Umístění logu závisí na instalaci; obvykle je v
+adresáři `Logs` uvnitř instalace Hearthstonu.
 
 ## Visual Studio
 

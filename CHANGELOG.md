@@ -10,6 +10,29 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.14.0] - 2026-09-05
+
+### Přidáno
+
+- **Průvodce připojením** pro případ, že tracker zůstává v režimu NASLOUCHÁM: čtyři kroky
+  se stavem (hra běží, logování v `log.config`, složka s hrou, `Power.log` běžící hry)
+  a tlačítka, která je opraví. **Zapnout logování** doplní do `log.config` sekci `[Power]`,
+  ostatní obsah nechá a původní soubor zálohuje jako `log.config.bak`; **Prohledat disky**
+  najde instalaci ve vlastní složce (třeba `D:\Hry\Hearthstone`); **Vybrat složku…** ji
+  uloží do nastavení; **Spustit tracker jako správce** pomůže, když hra běží jako správce.
+  Kontrola se opakuje každé dvě sekundy. Průvodce se otevírá z pruhu v overlayi, z menu
+  patičky, z nastavení (Data), argumentem `--setup` a sám při prvním spuštění, když hra
+  nemá zapnuté logování.
+- Pruh v overlayi při naslouchání říká jednou větou, na co tracker čeká (hra neběží, čeká
+  se na první zápas, chybí logování, nenašla se instalace); varovně se zbarví, když bez
+  zásahu uživatele nemá jak skončit.
+
+### Opraveno
+
+- Hra spuštěná jako správce: tracker nemohl přečíst start jejího procesu, žádný log
+  nepovažoval za aktuální a zůstal navždy v naslouchání. Teď v takovém případě bere log,
+  do kterého hra psala v posledních deseti minutách.
+
 ## [0.13.0] - 2026-09-05
 
 ### Přidáno
@@ -412,7 +435,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.13.0...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/myspulin24/bg-tracker/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/myspulin24/bg-tracker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/myspulin24/bg-tracker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/myspulin24/bg-tracker/compare/v0.10.1...v0.11.0
