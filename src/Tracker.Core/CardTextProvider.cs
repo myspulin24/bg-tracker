@@ -35,11 +35,7 @@ public sealed class CardTextProvider
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"BattlegroundsTracker/{TrackerVersion.Current}");
     }
 
-    public static string DefaultCachePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "BattlegroundsTracker",
-        "cards",
-        "cardtext.json");
+    public static string DefaultCachePath => Path.Combine(AppPaths.DataDirectory, "cards", "cardtext.json");
 
     public string CachePath => cachePath;
 

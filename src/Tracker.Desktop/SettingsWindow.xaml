@@ -1,0 +1,400 @@
+<Window x:Class="Tracker.Desktop.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Nastavení" Icon="Assets/bg-tracker.ico"
+        Width="640" Height="560" MinWidth="540" MinHeight="420"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="CanResize"
+        Background="{DynamicResource Brush.Window}" Topmost="True" ShowInTaskbar="False"
+        FontFamily="{StaticResource Font.Body}">
+    <!-- Stejný chrome jako okno s patch notes: nativní tažení a změna velikosti ze všech stran. -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
+                            GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <!-- Řádek nastavení: popis vlevo, ovládací prvek vpravo. -->
+        <Style x:Key="RowStyle" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <!-- Klíčové styly musí stavět na implicitním stylu TextBlocku, jinak nedostanou barvu
+             textu z motivu a zůstanou černé i v tmavém okně. -->
+        <Style x:Key="RowLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="RowHintStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text2}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+        <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontFamily" Value="{StaticResource Font.Display}" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <Style x:Key="GroupTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleStyle}">
+            <Setter Property="Margin" Value="0,6,0,8" />
+        </Style>
+        <Style x:Key="SliderValueStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource Brush.Window}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{DynamicResource Brush.Header}" BorderBrush="{DynamicResource Brush.Divider}" BorderThickness="0,0,0,1">
+                <Grid Margin="14,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE713;" Style="{StaticResource GlyphStyle}" FontSize="14" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,9,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Nastavení" FontSize="12.5" FontWeight="Bold" FontFamily="{StaticResource Font.Display}" />
+                        <TextBlock Text="Změny se projeví hned a ukládají se samy." FontSize="9.5" Foreground="{DynamicResource Brush.Text2}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" shell:WindowChrome.IsHitTestVisibleInChrome="True" Style="{StaticResource CloseButtonStyle}"
+                            Width="30" Height="28" Click="CloseButton_Click" ToolTip="Zavřít">
+                        <TextBlock Text="&#xE8BB;" Style="{StaticResource GlyphStyle}" FontSize="10" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="10,12,12,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" /><ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ListBox x:Name="Nav" Style="{StaticResource NavListStyle}" SelectionChanged="Nav_SelectionChanged" Margin="0,0,10,0">
+                    <ListBoxItem Content="Vzhled" Tag="&#xE790;" />
+                    <ListBoxItem Content="Rozložení" Tag="&#xE8A9;" />
+                    <ListBoxItem Content="Chování" Tag="&#xE7C4;" />
+                    <ListBoxItem Content="Data" Tag="&#xE8B7;" />
+                </ListBox>
+
+                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,0">
+                    <Grid>
+                        <!-- VZHLED -->
+                        <StackPanel x:Name="PageAppearance">
+                            <TextBlock Text="Vzhled" Style="{StaticResource PageTitleStyle}" />
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Motiv" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Tmavý základ sedí nad hrou, světlý na světlé plochy." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Style="{StaticResource SegmentGroupStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Style="{StaticResource SegmentStyle}" Content="Tmavý"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EnumEquals}, ConverterParameter=Dark}" />
+                                        <RadioButton Style="{StaticResource SegmentStyle}" Content="Světlý"
+                                                     IsChecked="{Binding Theme, Converter={StaticResource EnumEquals}, ConverterParameter=Light}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Akcent" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Zvýrazňovací barva: vlastní řádek v lobby, tiery, ovládání." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <RadioButton Style="{StaticResource AccentSwatchStyle}" Tag="#22D3EE" ToolTip="Tyrkysová"
+                                                 IsChecked="{Binding Accent, Converter={StaticResource EnumEquals}, ConverterParameter=Cyan}" />
+                                    <RadioButton Style="{StaticResource AccentSwatchStyle}" Tag="#58A6FF" ToolTip="Modrá"
+                                                 IsChecked="{Binding Accent, Converter={StaticResource EnumEquals}, ConverterParameter=Blue}" />
+                                    <RadioButton Style="{StaticResource AccentSwatchStyle}" Tag="#A78BFA" ToolTip="Fialová"
+                                                 IsChecked="{Binding Accent, Converter={StaticResource EnumEquals}, ConverterParameter=Violet}" />
+                                    <RadioButton Style="{StaticResource AccentSwatchStyle}" Tag="#34D399" ToolTip="Smaragdová"
+                                                 IsChecked="{Binding Accent, Converter={StaticResource EnumEquals}, ConverterParameter=Emerald}" />
+                                    <RadioButton Style="{StaticResource AccentSwatchStyle}" Tag="#F5B740" ToolTip="Jantarová"
+                                                 IsChecked="{Binding Accent, Converter={StaticResource EnumEquals}, ConverterParameter=Amber}" />
+                                    <RadioButton Style="{StaticResource AccentSwatchStyle}" Tag="#FB7185" ToolTip="Růžová" Margin="0"
+                                                 IsChecked="{Binding Accent, Converter={StaticResource EnumEquals}, ConverterParameter=Rose}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Krytí okna" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Kolik z hry pod overlayem prosvítá." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Slider Style="{StaticResource SliderStyle}" Width="150" Minimum="50" Maximum="100"
+                                            Value="{Binding OpacityPercent, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding OpacityPercent, Converter={StaticResource Percent}}" Style="{StaticResource SliderValueStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Zvětšení" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Velikost celého overlaye. Mění se i tažením za pravý dolní roh okna." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Slider Style="{StaticResource SliderStyle}" Width="150" Minimum="60" Maximum="160"
+                                            Value="{Binding ScalePercent, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding ScalePercent, Converter={StaticResource Percent}}" Style="{StaticResource SliderValueStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Vejít se na obrazovku" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Zvětšení se stáhne tak, aby rozbalené okno nezabralo víc než zvolenou část výšky plochy." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding FitToScreen}" />
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding FitToScreen}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Nejvýš z výšky obrazovky" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Podíl výšky pracovní plochy, který smí rozbalený overlay zabrat." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Slider Style="{StaticResource SliderStyle}" Width="150" Minimum="40" Maximum="98"
+                                            Value="{Binding ScreenSharePercent, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding ScreenSharePercent, Converter={StaticResource Percent}}" Style="{StaticResource SliderValueStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Hustota lobby" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Kompaktní má hrdinu i BattleTag na jednom řádku, pohodlná na dvou." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Style="{StaticResource SegmentGroupStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Style="{StaticResource SegmentStyle}" Content="Kompaktní"
+                                                     IsChecked="{Binding LobbyDensity, Converter={StaticResource EnumEquals}, ConverterParameter=Compact}" />
+                                        <RadioButton Style="{StaticResource SegmentStyle}" Content="Pohodlná"
+                                                     IsChecked="{Binding LobbyDensity, Converter={StaticResource EnumEquals}, ConverterParameter=Comfortable}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Kresby karet" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Portréty minionů na kartičkách se stahují z internetu (HearthstoneJSON). Vypnuté šetří síť i paměť." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowCardArt}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- ROZLOŽENÍ -->
+                        <StackPanel x:Name="PageLayout" Visibility="Collapsed">
+                            <TextBlock Text="Rozložení" Style="{StaticResource PageTitleStyle}" />
+                            <TextBlock Text="SEKCE" Style="{StaticResource GroupTitleStyle}" />
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Přehled" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Dlaždice s kolem, místem, zlatem a fází." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowStats}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Lobby" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Tabulka osmi hráčů s živým pořadím; po najetí myší ukáže poslední známou desku." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowLobby}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding ShowLobby}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="18,0,14,0">
+                                    <TextBlock Text="Řádek s dalším soupeřem" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="V Duos i kdo z dvojice bojuje první." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowNextOpponent}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding ShowLobby}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="18,0,14,0">
+                                    <TextBlock Text="Typy minionů v nabídce" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Typy, které se v této lobby objevily u Boba." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowRaces}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding ShowLobby}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="18,0,14,0">
+                                    <TextBlock Text="BattleTagy hráčů" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Jména hráčů vedle hrdinů; bez nich je tabulka klidnější." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowBattleTags}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Desky" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Vlastní deska a pod ní nabídka Boba, v souboji deska soupeře." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowBoards}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Ruka" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Karty v ruce včetně tavern kouzel." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowHand}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Detaily" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Bonusy pro celou hru, bonusy na kartách, trinkety a ekonomika krčmy." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowDetails}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding ShowDetails}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="18,0,14,0">
+                                    <TextBlock Text="Umístění detailů" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Vpravo je okno širší, dole vyšší." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Style="{StaticResource SegmentGroupStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Style="{StaticResource SegmentStyle}" Content="Vpravo"
+                                                     IsChecked="{Binding DetailPlacement, Converter={StaticResource EnumEquals}, ConverterParameter=Right}" />
+                                        <RadioButton Style="{StaticResource SegmentStyle}" Content="Dole"
+                                                     IsChecked="{Binding DetailPlacement, Converter={StaticResource EnumEquals}, ConverterParameter=Below}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Události" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Souboje, vyřazení a předané karty." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowEvents}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding ShowEvents}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="18,0,14,0">
+                                    <TextBlock Text="Počet událostí" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Kolik posledních událostí je vidět." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Slider Style="{StaticResource SliderStyle}" Width="120" Minimum="2" Maximum="6"
+                                            Value="{Binding EventCount, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding EventCount}" Style="{StaticResource SliderValueStyle}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Hudba" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Proužek s tím, co právě hraje ve Spotify, prohlížeči nebo přehrávači." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowMedia}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- CHOVÁNÍ -->
+                        <StackPanel x:Name="PageBehavior" Visibility="Collapsed">
+                            <TextBlock Text="Chování" Style="{StaticResource PageTitleStyle}" />
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Vždy navrchu" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Overlay zůstává nad hrou v okně nebo borderless fullscreenu." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding AlwaysOnTop}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Pamatovat polohu okna" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Příští spuštění otevře overlay tam, kde skončil. Mimo monitory se nikdy nepustí." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding RememberWindowPosition}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Spouštět sbalené" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Po startu zůstane jen pruh hlavičky; rozbalí se dvojklikem nebo tlačítkem." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding StartCollapsed}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Kontrolovat aktualizace" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Po startu se ověří nové vydání na GitHubu a stáhne na pozadí; nainstaluje se až při dalším spuštění." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding CheckForUpdates}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- DATA -->
+                        <StackPanel x:Name="PageData" Visibility="Collapsed">
+                            <TextBlock Text="Data" Style="{StaticResource PageTitleStyle}" />
+                            <TextBlock Text="Instalace Hearthstonu" Style="{StaticResource RowLabelStyle}" />
+                            <TextBlock Text="Vyplňte jen tehdy, když tracker Power.log nenajde sám: složku, ve které je adresář Logs. Obvyklá místa a registry se prohledávají vždy."
+                                       Style="{StaticResource RowHintStyle}" Margin="0,2,0,8" />
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding HearthstoneDirectory, UpdateSourceTrigger=LostFocus}" />
+                                <Button Grid.Column="1" Content="Vybrat…" Margin="6,0,0,0" Padding="10,4" Click="BrowseButton_Click" />
+                                <Button Grid.Column="2" Content="Vymazat" Margin="6,0,0,0" Padding="10,4" Click="ClearDirectoryButton_Click" />
+                            </Grid>
+
+                            <TextBlock Text="Složka dat" Style="{StaticResource RowLabelStyle}" />
+                            <TextBlock Text="Nastavení, archiv posledních zápasů, mezipaměť kreseb karet a data vestavěného prohlížeče."
+                                       Style="{StaticResource RowHintStyle}" Margin="0,2,0,8" />
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock x:Name="DataFolderText" FontSize="10.5" Foreground="{DynamicResource Brush.Text2}"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Content="Otevřít složku" Margin="6,0,0,0" Padding="10,4" Click="OpenDataFolderButton_Click" />
+                            </Grid>
+
+                            <TextBlock Text="Síť" Style="{StaticResource RowLabelStyle}" />
+                            <TextBlock Text="Tracker sahá na internet jen pro kontrolu aktualizací (GitHub), kresby a popisy karet (HearthstoneJSON) a patch notes. O uživateli neposílá nic než Card ID a jméno aplikace."
+                                       Style="{StaticResource RowHintStyle}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Divider}" BorderThickness="0,1,0,0" Padding="14,10">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="SettingsPathText" FontSize="9.5" Foreground="{DynamicResource Brush.Text3}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="1" Content="Obnovit výchozí" Click="ResetButton_Click" Margin="10,0,0,0" />
+                    <Button Grid.Column="2" Content="Zavřít" Style="{StaticResource AccentButtonStyle}" Click="CloseButton_Click" Margin="8,0,0,0" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

@@ -10,6 +10,51 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.12.0] - 2026-09-05
+
+Nový vzhled overlaye a okno nastavení. Všechny dosavadní funkce zůstávají; mění se, jak
+vypadají a kolik místa zabírají.
+
+### Přidáno
+
+- **Nastavení** pod ozubeným kolem v hlavičce a v menu patičky, ve čtyřech stránkách. Vzhled:
+  tmavý a světlý motiv, šest akcentů, krytí okna, zvětšení s volitelným stropem podle výšky
+  obrazovky, hustota lobby, kresby karet. Rozložení: zapínání každé sekce (přehled, lobby
+  s řádkem soupeře, typy minionů a BattleTagy, desky, ruka, detaily s umístěním vpravo nebo
+  dole, události s počtem, hudba). Chování: vždy navrchu, pamatování polohy okna, start
+  sbalený, kontrola aktualizací. Data: instalace Hearthstonu mimo obvyklé cesty a složka dat.
+  Změny se projeví hned a ukládají se samy do `settings.json`; soubor je čitelný a dá se
+  upravit ručně, chybějící nebo poškozené hodnoty nahradí výchozí.
+- Sekce **Ruka**: karty v ruce včetně tavern kouzel, ve výchozím stavu vypnutá.
+- Poloha okna se pamatuje mezi spuštěními; velikost se pamatuje jako zvětšení, které se mění
+  i tažením za pravý dolní roh okna.
+- Každá sekce má v nadpisu šipku na sbalení; dřív šlo sbalit jen desky.
+- Proměnná prostředí `BGTRACKER_DATA_DIR` přesměruje složku dat (nastavení, archiv zápasů,
+  mezipaměti karet, data prohlížeče). Hodí se pro přenosnou instalaci a pro snímky rozhraní
+  nad čistými daty; `LOCALAPPDATA` .NET na Windows nečte.
+
+### Změněno
+
+- **Kompaktní rozložení.** Hlavní sloupec má 380 návrhových jednotek místo 500, hlavička 42
+  místo 64, řádek lobby 22 místo 38 a řádek minionu 15 místo 18. Výška okna sleduje obsah:
+  co se schová nebo sbalí, o to je okno menší. Na FullHD zabere výchozí overlay 594 × 808 px
+  s panelem detailů a 380 × 808 bez něj; dřív 618 × 978 a 420 × 978.
+- **Design systém** v `Themes/Controls.xaml`: jedna paleta pro overlay, nastavení i patch
+  notes, ikonová tlačítka bez podkladu, tenké scrollbary, přepínače, posuvníky, segmentové
+  přepínače, štítky. Písmo Segoe UI Variable. Barvy se přepínají za běhu bez restartu.
+- Boční panel se stal panelem s detaily, který stojí vpravo nebo dole podle nastavení;
+  tlačítko v hlavičce ho skrývá jako dřív a se skrytým panelem se bonusy vrátí na řádek do
+  lobby.
+- Hlavička je nižší a nese režim čtení, zdroj, verzi a v Duos štítek; tlačítka sbalení
+  a zavření jsou ikonové.
+- Menu v patičce má navíc položku **Nastavení…**; diagnostika parseru je po najetí na patičku
+  a na značku „BG“.
+
+### Odebráno
+
+- Automatické sbalení desek na nízkém monitoru a pevné návrhové výšky 1163 a 879. Nahradil je
+  strop zvětšení podle výšky obrazovky a vypínání sekcí v nastavení.
+
 ## [0.11.0] - 2026-09-05
 
 Revize režimu Duos nad pěti skutečnými zápasy. Sólo se mění jen v umístění vyřazených hráčů.
@@ -350,7 +395,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.11.0...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/myspulin24/bg-tracker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/myspulin24/bg-tracker/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/myspulin24/bg-tracker/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/myspulin24/bg-tracker/compare/v0.9.3...v0.10.0

@@ -22,5 +22,5 @@ public sealed record ParticipantViewModel(
     public bool HasBoard => Board.Count > 0;
 
     /// <summary>Mezera nad prvním hrdinou týmu; v Duos je jinak z tabulky dvojice nepoznat.</summary>
-    public Thickness RowMargin => IsTeamStart ? new Thickness(0, 5, 0, 3) : new Thickness(0, 0, 0, 3);
+    public Thickness RowMargin => IsTeamStart ? new Thickness(0, 4, 0, 2) : new Thickness(0, 0, 0, 2);
 }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Web.WebView2.Core;
+using Tracker.Core;
 
 namespace Tracker.Desktop;
 
@@ -86,10 +87,7 @@ public partial class PatchNotesWindow : Window
         try
         {
             // Vlastní složka s daty: výchozí je vedle .exe, kam nemusí být právo zápisu.
-            var dataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "BattlegroundsTracker",
-                "webview2");
+            var dataFolder = Path.Combine(AppPaths.DataDirectory, "webview2");
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: dataFolder);
             await Browser.EnsureCoreWebView2Async(environment);
 

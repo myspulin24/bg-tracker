@@ -84,7 +84,12 @@ Pilot umí:
   a blood gemy a jaký plošný buff mají elementálové a piráti;
 - sledovat zlato, cenu upgradu tavernu, dalšího soupeře a historii soubojů;
 - zobrazit poslední významné události a diagnostiku parseru;
-- přehrát uložený log nebo vestavěnou syntetickou ukázku.
+- přehrát uložený log nebo vestavěnou syntetickou ukázku;
+- přizpůsobit se v nastavení: tmavý nebo světlý motiv, šest akcentů, krytí a zvětšení okna,
+  zapínání jednotlivých sekcí, umístění detailů vpravo nebo dole, počet událostí, hustota
+  lobby, vždy navrchu, pamatování polohy a instalace hry mimo obvyklé cesty. Nastavení se
+  ukládá do `%LOCALAPPDATA%\BattlegroundsTracker\settings.json`; složku dat přesměruje
+  proměnná prostředí `BGTRACKER_DATA_DIR`.
 
 `Power.log` není stabilní veřejné API. Skutečný formát se může mezi verzemi hry
 měnit a pilot záměrně netvrdí, že pozorovaná entita je vždy lokální hráč.

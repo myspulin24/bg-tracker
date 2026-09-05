@@ -40,10 +40,7 @@ public sealed class CardArtProvider
     }
 
     /// <summary>Kam se kresby ukládají, když volající nechce vlastní složku.</summary>
-    public static string DefaultCacheDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "BattlegroundsTracker",
-        "cardart");
+    public static string DefaultCacheDirectory => Path.Combine(AppPaths.DataDirectory, "cardart");
 
     public string CacheDirectory => cacheDirectory;
 

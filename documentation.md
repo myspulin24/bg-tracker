@@ -57,8 +57,8 @@ projít bez varování.
 
 | Projekt / cesta | Odpovědnost |
 | --- | --- |
-| `src/Tracker.Core` | Parser `Power.log`, hledání instalace hry, geometrie okna, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder`, data proužku s hudbou a stahování kreseb a popisů karet. |
-| `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, styly, ovládání okna, čtení systémových relací médií a okno s patch notes ve vestavěném prohlížeči. |
+| `src/Tracker.Core` | Parser `Power.log`, hledání instalace hry, geometrie okna, redukce událostí do stavu, model lobby, objevování logu, tail reader, archivace zápasů, `MatchRecorder`, uživatelské nastavení (`TrackerSettings`, `SettingsStore`), složka dat (`AppPaths`), data proužku s hudbou a stahování kreseb a popisů karet. |
+| `src/Tracker.Desktop` | Hlavní WPF overlay, režimy naslouchání/demo/live, view model, design systém (`Themes/Controls.xaml`, `ThemeManager`), okno nastavení, ovládání okna, čtení systémových relací médií a okno s patch notes ve vestavěném prohlížeči. |
 | `src/Tracker.App` | Původní konzolová varianta, replay a textový dashboard. |
 | `tests/Tracker.Tests` | Jednotkové testy parseru, redukce lobby a obnovy zápasového archivu. |
 | `assets/bg-tracker.ico` | Ikona „BG“ pro `.exe` obou aplikací i pro okno overlaye v hlavním panelu. Obsahuje velikosti 16 až 256. |
@@ -807,6 +807,7 @@ hry.
 
 ```text
 %LOCALAPPDATA%\BattlegroundsTracker\
+  settings.json                              (uživatelské nastavení, viz 11.7)
   checkpoint.json
   matches\
     match-yyyyMMdd-HHmmss-fff.power.log.br     (dohraný, zabalený)
@@ -821,6 +822,10 @@ hry.
 
 Složky `cardart` a `cards` jsou jen mezipaměti podle kapitoly 11.6. Smazat se dají kdykoli;
 aplikace si kresby i popisy stáhne znovu.
+
+Celou složku přesměruje proměnná prostředí `BGTRACKER_DATA_DIR` (`AppPaths.DataDirectory`).
+Hodí se pro přenosnou instalaci a pro snímky rozhraní nad čistými daty; proměnnou
+`LOCALAPPDATA` .NET na Windows nečte a bere složku přímo ze systému.
 
 ### 10.2.1 Komprese a retence
 
@@ -924,111 +929,96 @@ Vhodné budoucí rozšíření je:
 
 ### 11.1 Charakter okna
 
-Overlay je bezrámové WPF okno s průhledným okolím, vlastním tmavým designem a
-`Topmost=true`. Ikona okna i `.exe` je `assets/bg-tracker.ico`; v hlavičce overlaye je
-stejná značka „BG“ vykreslená přímo v XAML. Má vlastní tlačítko zavření, sbalení a resize grip. Okno lze táhnout za
-horní lištu.
+Overlay je bezrámové WPF okno s průhledným okolím, vlastním designem a `Topmost=true`, které
+se dá v nastavení vypnout. Ikona okna i `.exe` je `assets/bg-tracker.ico`; v hlavičce je
+stejná značka „BG“ vykreslená přímo v XAML. Hlavička nese název, verzi, režim čtení se
+zdrojem, v Duos štítek `DUOS`, a čtyři ikonová tlačítka: nastavení, panel s detaily, sbalení
+a zavření. Okno se táhne za hlavičku; ta je jediné místo, kterým se chytá, proto ji
+`WindowPlacement` nikdy nepustí mimo monitory.
 
-Dvojklik na horní lištu nebo tlačítko `−` overlay sbalí na pruh hlavičky: obsah se skryje,
-okno si nechá šířku a zmenší se na výšku hlavičky, resize se vypne a hlavička se zakulatí
-i dole, protože je pak celou kartou. Rozbalení vrátí předchozí velikost i možnost resize.
+Dvojklik na hlavičku nebo tlačítko sbalení overlay sbalí na pruh hlavičky: obsah se skryje,
+karta se přirozeně zmenší na výšku hlavičky a okno s ní, resize se vypne a hlavička se
+zakulatí i dole, protože je pak celou kartou. Zvětšení zůstává stejné jako před sbalením,
+aby pruh neposkočil. V nastavení jde zvolit, že overlay startuje sbalený.
 
-Sbalení musí kromě skrytí obsahu snížit i **návrhovou** výšku karty na 64 bodů. `Viewbox`
-škáluje celou kartu, takže dokud má karta plnou návrhovou výšku, udělá z ní nízké okno jen
-zdrobnělou miniaturu místo hlavičky v původní velikosti. Se stejnou výškou musí spadnout
-i `MinHeight` okna, který by ho na výšku hlavičky vůbec nepustil.
+Vzhled řídí design systém v `Themes/Controls.xaml`: tvary a chování ovládacích prvků jsou
+v XAML, barvy plní za běhu `ThemeManager` do zdrojů aplikace pod klíči `Brush.*` podle
+nastavení (tmavý nebo světlý základ, šest akcentů, krytí okna). XAML na ně odkazuje přes
+`DynamicResource`, takže přepnutí motivu překreslí hlavní okno, nastavení i patch notes bez
+restartu. Klíčové styly `TextBlock` musí stavět na implicitním stylu (`BasedOn`), jinak
+nedostanou barvu textu z motivu a zůstanou černé; přesně tak dopadla první verze okna
+nastavení. Písmo je Segoe UI Variable s návratem na Segoe UI.
 
 Běžné topmost WPF okno funguje spolehlivě nad windowed nebo borderless fullscreenem.
 Nad exkluzivním fullscreen režimem Windows nemusí overlay zobrazit. To je omezení typu
 okna, nikoli parseru.
 
-### 11.2 Poměrová velikost a pravidlo bez scrollu
+### 11.2 Velikost okna
 
-Rozložení se sází v návrhových jednotkách 736 × 1163, z toho 500 zabírá hlavní karta a 236
-boční panel (viz 11.3a). Celý obsah je zabalený do `Viewbox` se `Stretch="Uniform"`. Okno se
-pak nastaví na návrhovou velikost vynásobenou zvětšením, takže overlay zabere stejný podíl
-obrazovky na FullHD i na 4K a nic se neořezává ani nescrolluje.
+Rozložení se sází v návrhových jednotkách: hlavní sloupec je široký 380, panel s detaily
+vpravo přidává 214 a hlavička má 42 na výšku. Výška karty není pevná: sekce jsou nad sebou
+ve `StackPanel` a karta má přirozenou výšku toho, co je právě vidět. Celý obsah je zabalený
+do `Viewbox` se `Stretch="Uniform"` a okno se při každé změně velikosti karty
+(`RootCard.SizeChanged`) nastaví na návrhovou velikost vynásobenou zvětšením. Overlay tak
+zabere stejný podíl obrazovky na FullHD i na 4K, nic se neořezává ani nescrolluje, a když
+uživatel sekci schová, okno se o ni zmenší.
 
-Zvětšení se počítá z **výšky pracovní plochy**, ne z počtu pixelů:
-
-```text
-zvětšení = clamp(výška pracovní plochy × 0,94 / návrhová výška, 0,70, 1,30)
-```
-
-Pixely by byly špatná míra, protože `SystemParameters.WorkArea` je v jednotkách nezávislých na
-DPI. Na 4K se 200% zvětšením Windows už jednou zvětšily samy a druhé násobení podle pixelů by
-overlay nafouklo na dvojnásobek. Naměřené hodnoty:
-
-| pracovní plocha | zvětšení | okno s panelem | bez panelu |
-| --- | --- | --- | --- |
-| 900 (malý notebook) | 0,73 | 537 × 846 | 364 × 846 |
-| 1040 (FullHD) | 0,84 | 618 × 978 | 420 × 978 |
-| 1392 | 1,13 | 828 × 1308 | 563 × 1308 |
-| 1800 (4K při 100 %) | 1,30 | 957 × 1512 | 650 × 1512 |
-
-Meze zvětšení jsou tam kvůli čitelnosti: bez dolní by se na malém monitoru zdrobnila písmena
-k nečitelnosti, bez horní by overlay na velkém zabral půl obrazovky. Když by plné rozložení
-vyžadovalo zvětšení pod 0,85, sekce desek se při startu sbalí sama a zbytek se vejde
-v čitelnější velikosti.
-
-#### Původní pravidlo bez scrollu
-
-Výška se při každém vytvoření okna aktivně vypočítá:
+Zvětšení určuje nastavení (60 až 160 %, výchozí 100 %) a volitelný strop „vejít se na
+obrazovku“: zvětšení se stáhne tak, aby rozbalené okno nezabralo víc než zvolený podíl výšky
+pracovní plochy (výchozí 85 %):
 
 ```text
-min(1163, max(640, výška pracovní plochy - 24))     rozbalené
-min(879,  max(640, výška pracovní plochy - 24))     sbalené
+zvětšení = clamp(min(nastavené, výška pracovní plochy × podíl / výška karty), 0,6, 1,6)
 ```
 
-Šířka hlavní karty je 500 a s bočním panelem 736; minimální šířka okna je 440.
-Návrhové výšky pokrývají nejhorší možný obsah:
-osm hráčů lobby, sedm minionů vlastní desky, sedm karet v nabídce Boba nebo na desce
-soupeře a šest posledních událostí.
+Pracovní plocha je v jednotkách nezávislých na DPI, takže se do výpočtu nezanese zvětšení,
+které si Windows nastavují samy. Naměřeno s výchozím nastavením: 594 × 808 px s panelem
+vpravo a 380 × 808 bez něj; s detaily dole, rukou a pohodlnou lobby vyjde karta na zhruba
+1375 jednotek a strop ji na pracovní ploše 1392 stáhne na 327 × 1183.
+
+Tažení za úchop v pravém dolním rohu mění zvětšení: po čtvrt sekundě klidu se z nové šířky,
+nebo výšky podle toho, co uživatel táhl, spočítá zvětšení, zapíše do nastavení a okno dostane
+přesně odpovídající druhý rozměr, aby `Viewbox` nenechal prázdné pruhy. Velikost, kterou
+nastavil kód, se pozná porovnáním s očekávanou; `SizeChanged` totiž přichází až
+s rozvržením, ne v okamžiku, kdy kód vlastnost nastaví.
 
 Seznamy lobby, desky a nabídky jsou `ItemsControl`, nikoli `ListBox`, takže scrollovat
-principiálně nemohou. Místo pro maximální počet položek si rezervují napevno přes
-`MinHeight`, aby overlay při změně počtu minionů neposkakoval.
+principiálně nemohou. Místo pro maximální počet položek si rezervují přes `MinHeight`: osm
+řádků lobby, sedm minionů na desce i v nabídce, zvolený počet událostí. Okno tak při změně
+počtu položek neposkakuje. Jediný scrollovatelný panel jsou události: mají strop na
+dvojnásobek rezervované výšky, takže delší zalomené texty rolují, místo aby zvětšovaly okno.
 
-Jediný scrollovatelný panel je `POSLEDNÍ UDÁLOSTI`. Ten zůstává interaktivní, aby v něm
-fungovalo kolečko myši i tažení scrollbaru.
-
-Právě proto má jeho řádek malou `MinHeight` (60), zatímco ostatní seznamy si místo rezervují
-napevno. Výška karty je pevná, takže když se nad spodní lištou objeví pruh s načítáním
-zápasu nebo s nabídkou aktualizace, přebytek se nemá kam vejít a mřížka odřízne poslední
-řádek — tedy tlačítka. Události mají scrollbar, a tak jsou jediný panel, který se smí
-zmenšit; s `MinHeight="159"` se lišta při načítání vybraného logu rozbíjela.
-
-Rozložení má tři návrhové výšky: 1163 bodů s rozbalenými deskami, 879 se sbalenými
-a 64 pro sbalený overlay, tedy samotný pruh hlavičky (viz 11.1).
-Ta první se nevejde na monitor s rozlišením 1920×1080, kde po odečtení hlavního panelu
-zbývá kolem 1010 bodů. Proto jde sekce s deskami sbalit klikem na její nadpis.
-**Když je při startu k dispozici méně místa, než potřebuje plné rozložení, sekce se sbalí
-sama**, aby uživatel nepřišel o spodek okna s ovládacími tlačítky.
+Poloha okna se pamatuje a při startu obnoví, pokud to uživatel nevypne; `WindowPlacement.Clamp`
+ji stáhne zpátky, když monitor, na kterém overlay skončil, už není.
 
 ### 11.3 Obsah
 
-Horní karty zobrazují kolo, aktuální místo v žebříčku, zlato a fázi.
+Pod hlavičkou jdou sekce nad sebou; každá se dá v nastavení vypnout a většina má v nadpisu
+šipku, kterou se za běhu sbalí:
 
-Pod nimi je řádek s dalším soupeřem a cenou upgradu tavernu, následovaný tabulkou lobby
-se sloupci:
+1. **Přehled** – čtyři dlaždice: kolo, místo v žebříčku (`5/8`, v Duos `2/4`), zlato a fáze.
+2. **Lobby** – řádek s dalším soupeřem a cenou upgradu tavernu, typy minionů v nabídce
+   a tabulka osmi hráčů se sloupci `#`, `HRDINA`, `HP`, `ARM`, `TIER`, `TRIP`. Kompaktní
+   hustota má hrdinu i BattleTag na jednom řádku (22 jednotek), pohodlná na dvou (30);
+   BattleTagy jdou schovat úplně.
+3. **Desky** – vlastní deska a pod ní `NABÍDKA BOBA`, nebo v souboji `DESKA SOUPEŘE`.
+4. **Ruka** – karty v ruce včetně tavern kouzel; ve výchozím stavu vypnutá, protože ji hra
+   ukazuje sama.
+5. **Detaily** – bonusy pro celou hru, bonusy na kartách, trinkety a ekonomika krčmy; buď ve
+   sloupci vpravo, nebo pod hlavním sloupcem (11.3a).
+6. **Události** – dvě až šest posledních událostí.
+7. Pruhy, které se ukazují jen občas: aktualizace, načítání zápasu a hudba (11.3b).
+8. **Patička** – stav a výsledek, po najetí diagnostika parseru; vpravo patch notes a menu
+   s ovládáním.
 
-- `#` – 20, pořadí spočítané ze zbývajících životů;
-- `HRDINA / BATTLETAG` – flexibilní zbytek šířky;
-- `HP` – 32;
-- `ARMOR` – 40;
-- `TIER` – 30;
-- `TRIPLE` – 42, počet dosažených triplů.
+Stejné grid šířky používá hlavička tabulky i každý datový řádek, proto jsou hodnoty přesně
+pod nadpisy. Název hrdiny a BattleTag se při nedostatku šířky oříznou ellipsis.
 
-Stejné grid šířky používá hlavička i každý datový řádek, proto jsou hodnoty přesně pod
-nadpisy. Název hrdiny a BattleTag se při nedostatku šířky oříznou ellipsis.
-
-Nad tabulkou je ještě řádek s typy minionů, které se objevily v nabídce Boba.
-
-Řádek lobby je barevně odlišený: modrý pro lokálního hráče, zelený pro spoluhráče v Duos,
-okrový pro dalšího soupeře. V Duos jsou dvojice oddělené mezerou a číslo místa se píše jen
-k prvnímu z nich, protože místo patří týmu; podrobnosti v kapitole 8.8. Karta `MÍSTO` ukazuje
-`3/4` v Duos a `5/8` v sólu a v hlavičce okna přibude vedle režimu čtení popisek `DUOS`.
-Vyřazený hráč je ztlumený, má lebku před jménem hrdiny a místo HP křížek.
+Řádek lobby je barevně odlišený: akcentem pro lokálního hráče, zeleně pro spoluhráče v Duos,
+oranžově pro dalšího soupeře. V Duos jsou dvojice oddělené mezerou a číslo místa se píše jen
+k prvnímu z nich, protože místo patří týmu; podrobnosti v kapitole 8.8. V hlavičce okna přibude
+vedle režimu čtení štítek `DUOS`. Vyřazený hráč je ztlumený, má lebku před jménem hrdiny
+a místo HP křížek.
 
 Načítání uloženého zápasu běží na pozadí a nad tlačítky se po tu dobu ukazuje pruh s postupem.
 Půl milionu řádků se parsuje pár sekund a na vlákně rozhraní by okno mezitím zamrzlo. Postup se
@@ -1046,7 +1036,7 @@ prvním souboji.
 Následuje karta s vlastní deskou a pod ní buď `NABÍDKA BOBA`, nebo `DESKA SOUPEŘE` podle
 toho, jestli právě běží souboj. Každý řádek ukazuje pozici, hvězdičku u zlaté karty,
 jméno, klíčová slova celým jménem (`Taunt`, `Divine Shield`, `Reborn`, `Venomous`,
-`Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako číslo s hvězdičkou.
+`Windfury`), útok u ikony meče, život u ikony srdce a tavern tier jako číslo v akcentu.
 Statistiky nad tisíc se krátí přes `StatFormat.Compact` na `1k` nebo `2,4k`; v pozdních kolech
 mají čtyři místa a do sloupců ani na kartičku se nevejdou. Zaokrouhluje se vždy dolů, aby
 zkratka netvrdila víc, než minion doopravdy má.
@@ -1057,8 +1047,8 @@ Po najetí myší na řádek se vlevo ukáže tatáž kartička jako v podokně 
 transformací na dvojnásobek, a pod ní řádek s typem minionu, pozicí a celými klíčovými
 slovy. Do kartičky se klíčová slova vejdou jen oříznutá, protože má pevnou šířku.
 
-Klik na nadpis `MOJE DESKA` celou tuhle kartu sbalí a okno se o její výšku zmenší. Slouží
-to monitorům, na které se plné rozložení nevejde; podrobnosti v kapitole 11.2.
+Klik na nadpis kterékoli sekce ji sbalí a okno se o ni zmenší; sbalení platí do konce běhu,
+trvalé schování sekce je v nastavení (11.7).
 
 Panel `POSLEDNÍ UDÁLOSTI` se drží toho, co se týká vlastního hrdiny, respektive vlastního týmu
 v Duos. Souboj hlásí kolo, soupeře, výsledek a poškození: `Kolo 12 · já vs Vanndar Stormpike:
@@ -1081,8 +1071,9 @@ proto přepisuje už zveřejněnou hlášku na jejím místě; přepis jen posle
 protože se mezi ni a doplněk vešlo vyřazení hráče.
 
 Panel zobrazuje události od nejnovější po nejstarší. `TrackerState`
-uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel je na
-šest řádků navržený, takže se scrollbar objeví jen u delších zalomených textů.
+uchovává frontu maximálně šesti položek; po přidání sedmé zahodí nejstarší. Panel ukazuje
+zvolený počet, dvě až šest (výchozí pět), a rezervuje si na ně místo, takže se scrollbar
+objeví jen u delších zalomených textů.
 
 V hlavičce je verze jako odznáček hned za názvem aplikace. Jeho výška je svázaná
 s `ActualHeight` titulku, takže sedí na stejné lince i kdyby se velikost názvu změnila.
@@ -1090,13 +1081,15 @@ Ladicí build se pozná i barvou: okrový rámeček a okrové písmo místo tlum
 vůbec neběží — přesně to se stalo, když vydaný Release zůstal o dva dny starší než opravený
 Debug.
 
-Dolní část obsahuje stav, výsledek a diagnostiku počtu zpracovaných řádků a rozpoznaných
-událostí. Vpravo na témže řádku jsou dvě ikony: patch notes a ovládání. Ovládání se
-otevírá jako menu s položkami:
+Patička obsahuje stav a výsledek; diagnostika počtu zpracovaných řádků a rozpoznaných
+událostí je po najetí myší na ni i na značku „BG“ v hlavičce. Vpravo na témže řádku jsou dvě
+ikony: patch notes a ovládání. Ovládání se otevírá jako menu s položkami:
 
 - **Vybrat log…** – standardní file dialog;
 - **Spustit demo** – reset a syntetická data;
 - **Pozastavit / Pokračovat** – zastaví nebo spustí timer;
+- **Nastavení…** – totéž co ozubené kolo v hlavičce;
+- **Vrátit okno na obrazovku** – vystředí okno na hlavní monitor;
 - **Restart** – restartuje aktuální režim.
 
 Původně to byla čtyři tlačítka na samostatném řádku, který v pevné výšce karty zabíral
@@ -1133,9 +1126,11 @@ nepodařilo nastartovat. Data prohlížeče jdou do
 `%LOCALAPPDATA%\BattlegroundsTracker\webview2`, protože výchozí složka leží vedle `.exe`,
 kam nemusí být právo zápisu.
 
-### 11.3a Boční panel
+### 11.3a Panel s detaily
 
-Vpravo od hlavní karty je sloupec o šířce 236 návrhových jednotek se třemi sekcemi:
+Panel s detaily stojí buď ve sloupci vpravo od hlavního sloupce (204 návrhových jednotek plus
+odsazení), nebo pod ním, podle nastavení. Je to jedna šablona `DetailsTemplate` ve dvou
+hostitelích; vidět je vždy jen jeden. Má čtyři sekce:
 
 | sekce | co ukazuje | odkud |
 | --- | --- | --- |
@@ -1162,10 +1157,11 @@ rerolly a zlato navíc se naopak ukazují jen tehdy, když je hráč skutečně 
 hry nejsou. Nula a neznámo se rozlišují: cena rerollu nula je `zdarma`, chybějící hodnota je
 pomlčka a na posledním tieru je místo ceny upgradu `max`.
 
-Panel se skrývá tlačítkem v hlavičce. Zmizí i jeho sloupec v mřížce, takže se karta zúží zpátky
-na 500 jednotek a okno na původní šířku; naměřeno 828 px s panelem a 563 px bez něj. Se
-schovaným panelem se bonusy vrátí na jeden řádek do karty lobby, aby o ně uživatel nepřišel —
-a naopak se s panelem ten řádek schová, aby tatáž informace nestála na dvou místech.
+Panel se skrývá tlačítkem v hlavičce nebo v nastavení, kde se volí i jeho umístění. Vpravo
+zmizí i jeho sloupec v mřížce, takže se karta zúží zpátky na 380 jednotek a okno na původní
+šířku; naměřeno 594 px s panelem a 380 px bez něj. Se schovaným panelem se bonusy vrátí na
+jeden řádek do karty lobby, aby o ně uživatel nepřišel — a naopak se s panelem ten řádek
+schová, aby tatáž informace nestála na dvou místech.
 
 ### 11.3b Proužek s hudbou
 
@@ -1219,11 +1215,14 @@ uvnitř řádku lobby je výjimka: porovnává se podle reference, a view model 
 stejnou instanci, dokud se obsah desky nezmění. Jinak by se řádek nahrazoval při každém
 ticku a zavíral právě otevřené podokno.
 
-### 11.5 Scrollbary
+### 11.5 Styly ovládacích prvků
 
-Styly scrollbarů jsou definované v `Tracker.Desktop/App.xaml`. Používají vlastní tmavé
-pozadí, zaoblený thumb a barvy sladěné s kartami overlaye. Nativní světlý scrollbar se
-proto v panelu událostí nepoužívá.
+Všechny styly jsou v `Tracker.Desktop/Themes/Controls.xaml`, které `App.xaml` jen připojí:
+tlačítka s textem, ikonová a zavírací tlačítka, hlavička sekce jako přepínač se šipkou,
+přepínač ano/ne, segmentový přepínač, vzorek akcentu, posuvník, navigace nastavení,
+ukazatel postupu, textové pole, tooltip, kontextové menu a tenký scrollbar bez dráhy, který
+ukazuje jen jezdec. Nativní světlé prvky se proto nikde nepoužívají a přepnutí motivu
+překreslí i je, protože berou barvy přes `DynamicResource`.
 
 ### 11.6 Kartičky minionů, kresby a popisy karet
 
@@ -1313,7 +1312,41 @@ sedí v horní polovině. Bez toho koukaly v okrajích oválu světlé kraje čt
 
 Obojí se vyžádá už při složení modelu pohledu, ne až při najetí myší. Než uživatel na řádek
 najede, jsou data zpravidla stažená. Když se stáhnout nepodaří, kartička se vykreslí na
-tmavém podkladu, popis se vynechá a všechny ostatní údaje zůstanou čitelné.
+tmavém podkladu, popis se vynechá a všechny ostatní údaje zůstanou čitelné. Kresby se dají
+v nastavení vypnout úplně; pak zůstane jen tmavý ovál a nic se nestahuje.
+
+### 11.7 Nastavení
+
+Okno nastavení otevírá ozubené kolo v hlavičce nebo položka v menu patičky. Je jen jedno,
+sedí nad overlayem (`Owner`, `Topmost`) a používá stejný `WindowChrome` jako patch notes,
+takže se táhne za titulek a zvětšuje ze všech stran. Vlevo je navigace se čtyřmi stránkami,
+vpravo řádky „popis vlevo, ovládací prvek vpravo“:
+
+| stránka | co nastavuje |
+| --- | --- |
+| Vzhled | motiv (tmavý, světlý), akcent (šest barev), krytí okna 50 až 100 %, zvětšení 60 až 160 %, strop podle výšky obrazovky a jeho podíl, hustota lobby, kresby karet |
+| Rozložení | přehled, lobby (řádek s dalším soupeřem, typy minionů, BattleTagy), desky, ruka, detaily a jejich umístění, události a jejich počet, hudba |
+| Chování | vždy navrchu, pamatovat polohu okna, spouštět sbalené, kontrolovat aktualizace |
+| Data | instalace Hearthstonu mimo obvyklé cesty, složka dat s tlačítkem do Průzkumníka, co aplikace posílá na síť |
+
+Formulář je svázaný přímo s `UserSettings`, obalem nad `TrackerSettings` z Core, který
+každou změnu ohlásí. Hlavní okno na ni reaguje hned: motiv a akcent přes `ThemeManager`,
+zvětšení přepočtem velikosti, umístění detailů přesunem panelu, ostatní přes vazby
+viditelnosti v XAML a odvozené hodnoty ve view modelu (výška řádku lobby, počet událostí).
+Tlačítko Uložit není; `SettingsStore` zapíše `settings.json` půl sekundy po poslední změně
+a při zavření okna, přes dočasný soubor, aby po pádu uprostřed zápisu nezůstal useknutý JSON.
+Tažení okna se do nastavení zapisuje jako poloha, tažení za roh jako zvětšení.
+
+Soubor je čitelný JSON s výčty jako slova (`"Theme": "Light"`), aby se dal upravit ručně.
+Chybějící klíče dostanou výchozí hodnotu, cizí klíče se ignorují a hodnoty mimo rozsah srovná
+`TrackerSettings.Normalized`, aby ručně upravený soubor nemohl vyrobit neviditelné nebo obří
+okno. Poškozený soubor dá výchozí nastavení a nikdy aplikaci nezastaví.
+
+Přepínače výčtů jsou `RadioButton` svázané přes `EnumEqualsConverter`: dopředu říká, jestli
+je právě tahle možnost vybraná, zpět při zaškrtnutí zapíše hodnotu. Vzorky akcentu nesou
+barvu v `Tag` jako text; v šabloně ji na štětec převede obyčejná vazba, protože
+`TemplateBinding` typ nepřevádí a vzorek by zůstal prázdný. Instalaci hry vybírá
+`OpenFolderDialog` z .NET 8.
 
 ## 12. Konzolová aplikace
 
@@ -1536,7 +1569,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje sto sedmnáct testů.
+Test suite aktuálně obsahuje sto dvacet dva testů.
 
 Původní čtyři:
 
@@ -1596,13 +1629,19 @@ Jeden v `BattlegroundsStateTests` navíc ověřuje umístění vyřazených hrá
 těch, kdo zůstali ve hře, a dva pády v jednom kole řadí zbývající životy, ať tagy `DAMAGE`
 přišly v jakémkoli pořadí.
 
+Čtyři v `SettingsTests` pokrývají nastavení: uložení a načtení každé hodnoty do čitelného
+JSON s výčty jako slova, výchozí hodnoty při chybějícím i poškozeném souboru, ignorování
+cizích klíčů a doplnění chybějících, a srovnání hodnot mimo rozsah. Jeden v `AppPathsTests`
+ověřuje, že složku dat přesměruje proměnná `BGTRACKER_DATA_DIR` a bez ní zůstává pod
+LOCALAPPDATA.
+
 Dva v `MatchLogArchiveTests` pokrývají kompresi: zabalení dohraného zápasu se zachováním
 obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s ořezem retence.
 
 Čtrnáct v `StatFormatTests` pokrývá zkrácený zápis statistik: hranice tisíce, desetinu jen do
 deseti tisíc, zaokrouhlování vždy dolů a zástupný znak u neznámé hodnoty.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 117 testů prošlo.
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 122 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1667,10 +1706,11 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
 16. **Typy minionů jsou pozorované, ne oficiální.** Seznam se plní za běhu, takže je
     v prvních kolech neúplný, a karta patřící do víc poolů zároveň může přidat typ, který
     lobby ve skutečnosti nenabízí. Podrobnosti v kapitole 8.6.
-17. **Pozice a šířka okna se nepersistují.** Výška se vypočítá při startu, uživatelské
-    přesunutí nebo resize se mezi relacemi neukládají.
-18. **Sbalení desek se nepamatuje.** Na nižším monitoru se sekce sbalí sama při každém
-    startu, ruční volba se ale mezi spuštěními neukládá.
+17. **Sbalení sekcí za běhu se nepamatuje.** Šipky u nadpisů platí do konce běhu; trvalé je
+    jen vypnutí sekce v nastavení. Poloha okna a zvětšení se naopak pamatují.
+18. **Poškozený `settings.json` se potichu nahradí výchozími hodnotami.** Stačí jedna
+    neplatná hodnota výčtu a celý soubor se zahodí; aplikace o tom nic neřekne, jen se otevře
+    ve výchozím vzhledu.
 19. **Jména spoluhráčů v Duos nejsou vždy k mání.** Log pojmenuje jen hráče, jejichž entita
     se v něm objevila; ostatní zůstanou jako `Skrytý hráč`. Vlastní spoluhráč jméno nedostane
     nikdy, protože jeho hrdinu hra věší na entitu lokálního hráče. Jeho deska se ukládá jen

@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Windows.Input;
 using System.Text.RegularExpressions;
 using System.Windows.Threading;
 using Tracker.Core;
+using Tracker.Desktop.Themes;
 
 namespace Tracker.Desktop;
 
@@ -22,65 +24,72 @@ public partial class MainWindow : Window
         Replay
     }
 
-    /// <summary>Šířka hlavní karty. Obsah se sází v návrhových jednotkách a Viewbox ho škáluje.</summary>
-    private const double MainDesignWidth = 500;
+    /// <summary>Šířka hlavního sloupce. Obsah se sází v návrhových jednotkách a Viewbox ho škáluje.</summary>
+    private const double MainDesignWidth = 380;
 
-    /// <summary>Šířka sloupce s bočním panelem včetně odsazení od pravého okraje karty.</summary>
-    private const double SideDesignWidth = 236;
+    /// <summary>Šířka sloupce s detaily včetně odsazení od hlavního sloupce.</summary>
+    private const double DetailsDesignWidth = 214;
 
-    /// <summary>Výška, na kterou je rozložení navržené, aby se žádný panel nemusel scrollovat.</summary>
-    private const double ExpandedDesignHeight = 1163;
-
-    /// <summary>Táž výška se sbalenou sekcí desek.</summary>
-    private const double CollapsedDesignHeight = 879;
-
-    /// <summary>
-    /// Návrhová výška hlavičky, tedy řádku 0 v rozložení. Sbalený overlay je jen tenhle pruh.
-    /// </summary>
-    private const double HeaderDesignHeight = 64;
-
-    /// <summary>Jakou část výšky pracovní plochy má overlay zabrat.</summary>
-    private const double WorkAreaShare = 0.94;
-
-    /// <summary>
-    /// Mezní zvětšení. Bez dolní hranice by na malém monitoru zdrobněla písmena k nečitelnosti,
-    /// bez horní by na velkém overlay zabral půl obrazovky.
-    /// </summary>
-    private const double MinScale = 0.70;
-    private const double MaxScale = 1.30;
-
-    /// <summary>Pod tímhle zvětšením se sekce desek radši sbalí, než aby se drobnilo písmo.</summary>
-    private const double CollapseBelowScale = 0.85;
+    /// <summary>Návrhová výška hlavičky, tedy řádku 0 v rozložení. Sbalený overlay je jen tenhle pruh.</summary>
+    private const double HeaderDesignHeight = 42;
 
     /// <summary>Jak často se v živém režimu ověří, jestli hra nezaložila nový session log.</summary>
     private const int LiveDiscoveryIntervalTicks = 15;
 
-    private readonly MainViewModel viewModel = new();
-    private PowerLogParser parser = new();
+    private readonly UserSettings settings;
+    private readonly MainViewModel viewModel;
     private readonly DispatcherTimer timer;
+    private readonly DispatcherTimer saveTimer;
+    private readonly DispatcherTimer resizeTimer;
+    private readonly MediaSessionWatcher media;
+    private readonly CancellationTokenSource updates = new();
+    private PowerLogParser parser = new();
     private GameStateTracker tracker = new();
     private PowerLogTailReader? liveReader;
     private MatchLogArchive? matchArchive;
     private int demoIndex;
-    private double expandedWidth = MainDesignWidth + SideDesignWidth;
-    private double expandedHeight = ExpandedDesignHeight;
-    private double expandedMinHeight = 640;
     private bool isCollapsed;
     private bool isReading;
     private bool isSourceAutoDiscovered;
     private int ticksSinceDiscovery;
     private TrackerMode mode;
-    private readonly CancellationTokenSource updates = new();
-    private readonly MediaSessionWatcher media;
+
+    /// <summary>Přirozená výška rozbalené karty; z ní se počítá zvětšení i ve sbaleném stavu.</summary>
+    private double expandedDesignHeight;
+
+    /// <summary>Velikost, kterou okno dostalo od kódu. Co se od ní liší, změnil uživatel úchopem.</summary>
+    private Size expectedSize;
 
     public MainWindow()
     {
+        // Paleta musí být ve zdrojích dřív, než se okno postaví; jinak by první snímek přišel
+        // ve výchozích barvách a pak přeskočil.
+        settings = new UserSettings(SettingsStore.Load(SettingsStore.DefaultPath));
+        ThemeManager.Apply(settings.Model, Application.Current.Resources);
         InitializeComponent();
 
-        // Na monitoru, kde by se plné rozložení muselo hodně zdrobnit, se desky sbalí rovnou.
-        // Zbytek se pak vejde v čitelnější velikosti.
-        SetBoardsVisible(ScaleFor(ExpandedDesignHeight) >= CollapseBelowScale);
+        viewModel = new MainViewModel(settings);
         DataContext = viewModel;
+        Topmost = settings.AlwaysOnTop;
+        ApplyDetailsPlacement();
+        RestoreStartupPosition();
+
+        settings.PropertyChanged += Settings_PropertyChanged;
+        saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        saveTimer.Tick += (_, _) =>
+        {
+            saveTimer.Stop();
+            SaveSettings();
+        };
+
+        // Tažení za úchop mění velikost mnohokrát za sekundu; zvětšení se do nastavení zapíše,
+        // až se ruka zastaví, jinak by okno s uživatelem bojovalo o každý pixel.
+        resizeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        resizeTimer.Tick += (_, _) =>
+        {
+            resizeTimer.Stop();
+            CommitUserResize();
+        };
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
         timer.Tick += Timer_Tick;
@@ -93,8 +102,7 @@ public partial class MainWindow : Window
     private void Media_Updated(object? sender, EventArgs eventArgs) =>
         viewModel.ApplyMedia(media.Current, media.Art);
 
-    // Příkazy nic nevracejí: nový stav přijde z ohlášené změny a chyby si hlídá sledovač sám,
-    // takže tu není co čekat ani co obsluhovat.
+    // Příkazy nic nevracejí: nový stav přijde z ohlášené změny a chyby si hlídá sledovač sám.
     private void MediaPlayPauseButton_Click(object sender, RoutedEventArgs eventArgs) =>
         _ = media.TogglePlayPauseAsync();
 
@@ -104,107 +112,193 @@ public partial class MainWindow : Window
     private void MediaPreviousButton_Click(object sender, RoutedEventArgs eventArgs) =>
         _ = media.SkipPreviousAsync();
 
-    private void ToggleBoardsButton_Click(object sender, RoutedEventArgs eventArgs) =>
-        SetBoardsVisible(BoardsContent.Visibility != Visibility.Visible);
+    private void SettingsButton_Click(object sender, RoutedEventArgs eventArgs) => SettingsWindow.Open(this, settings);
+
+    private void DetailsToggleButton_Click(object sender, RoutedEventArgs eventArgs) =>
+        settings.ShowDetails = !settings.ShowDetails;
+
+    /// <summary>Návrhová šířka podle toho, jestli vpravo stojí panel s detaily.</summary>
+    private double DesignWidth => MainDesignWidth + (IsDetailsRight ? DetailsDesignWidth : 0);
+
+    private bool IsDetailsRight => settings.ShowDetails && settings.DetailPlacement == DetailPlacement.Right;
 
     /// <summary>
-    /// Sbalí nebo rozbalí sekci s deskami a rovnou přizpůsobí výšku okna, aby po sbalení
-    /// nezůstalo prázdné místo a po rozbalení se obsah vešel.
+    /// Umístí panel s detaily vpravo, pod hlavní sloupec, nebo ho schová. S panelem vpravo
+    /// roste návrhová šířka karty; bez něj se karta zúží zpátky na hlavní sloupec.
     /// </summary>
-    private void SetBoardsVisible(bool visible)
+    private void ApplyDetailsPlacement()
     {
-        BoardsContent.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        BoardsChevron.Text = visible ? "▾" : "▸";
-        // Nadpis drží view model: v Duos říká, čí deska na lokální straně právě stojí.
-        viewModel.AreBoardsCollapsed = !visible;
-        UpdateWindowHeight();
+        var right = IsDetailsRight;
+        DetailsRightHost.Visibility = right ? Visibility.Visible : Visibility.Collapsed;
+        DetailsColumn.Width = new GridLength(right ? DetailsDesignWidth : 0);
+        DetailsBelowHost.Visibility = settings.ShowDetails && settings.DetailPlacement == DetailPlacement.Below
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        RootCard.Width = DesignWidth;
+        DetailsToggleGlyph.Text = settings.ShowDetails ? "" : "";
+        DetailsToggleButton.ToolTip = settings.ShowDetails ? "Skrýt panel s detaily" : "Zobrazit panel s detaily";
+        ApplyWindowSize();
     }
 
     /// <summary>
-    /// Přepočítá velikost okna. Rozložení se sází v návrhových jednotkách a <c>Viewbox</c> ho
-    /// zvětší nebo zmenší na okno, takže overlay zabere stejný podíl obrazovky na FullHD i na 4K
-    /// a nic se nemusí ořezávat ani scrollovat.
+    /// Karta změnila přirozenou velikost: přibyla nebo zmizela sekce, změnil se počet událostí,
+    /// sbalila se. Okno se jí musí přizpůsobit, jinak by Viewbox obsah zdrobnil nebo nechal
+    /// prázdné okraje.
     /// </summary>
-    private void UpdateWindowHeight()
+    private void RootCard_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
     {
-        var design = DesignHeight;
-        var scale = ScaleFor(design);
-        MinWidth = DesignWidth * MinScale;
-        expandedMinHeight = CollapsedDesignHeight * MinScale;
-        expandedWidth = DesignWidth * scale;
-        expandedHeight = design * scale;
-
-        if (isCollapsed)
+        if (!isCollapsed && RootCard.ActualHeight > 0)
         {
-            ApplyCollapsedSize(expandedWidth);
-        }
-        else
-        {
-            ApplyExpandedSize();
+            expandedDesignHeight = RootCard.ActualHeight;
         }
 
+        ApplyWindowSize();
+    }
+
+    /// <summary>
+    /// Přepočítá velikost okna z návrhové velikosti karty a zvětšení. Zvětšení se bere vždy
+    /// z rozbalené karty, aby sbalená hlavička zůstala stejně velká, jako byla před sbalením.
+    /// </summary>
+    private void ApplyWindowSize()
+    {
+        if (expandedDesignHeight <= 0)
+        {
+            return;
+        }
+
+        var scale = ScaleFor(expandedDesignHeight);
+        var designWidth = DesignWidth;
+        var designHeight = isCollapsed ? HeaderDesignHeight : expandedDesignHeight;
+        MinWidth = designWidth * TrackerSettings.MinScale;
+        MinHeight = HeaderDesignHeight * TrackerSettings.MinScale;
+        expectedSize = new Size(designWidth * scale, designHeight * scale);
+        Width = expectedSize.Width;
+        Height = expectedSize.Height;
         EnsureOnScreen();
     }
 
-    /// <summary>Návrhová výška podle toho, jestli je vidět sekce desek.</summary>
-    private double DesignHeight => BoardsContent.Visibility == Visibility.Visible
-        ? ExpandedDesignHeight
-        : CollapsedDesignHeight;
-
-    /// <summary>Návrhová šířka podle toho, jestli je vidět boční panel.</summary>
-    private double DesignWidth => MainDesignWidth +
-        (SidePanel.Visibility == Visibility.Visible ? SideDesignWidth : 0);
-
-    private void SidePanelButton_Click(object sender, RoutedEventArgs eventArgs) =>
-        SetSidePanelVisible(SidePanel.Visibility != Visibility.Visible);
-
     /// <summary>
-    /// Ukáže nebo schová boční panel. Kromě panelu se musí zavřít i jeho sloupec v mřížce,
-    /// jinak by po skrytí zůstalo v kartě prázdné místo, a s ním se mění návrhová šířka, ze
-    /// které se počítá velikost okna.
+    /// Zvětšení z nastavení, případně stažené tak, aby se rozbalené okno vešlo do zvolené části
+    /// výšky pracovní plochy. Pracovní plocha je v jednotkách nezávislých na DPI, takže se do
+    /// výpočtu nezanese zvětšení, které si Windows nastavují samy.
     /// </summary>
-    private void SetSidePanelVisible(bool visible)
+    private double ScaleFor(double designHeight)
     {
-        SidePanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        SideColumn.Width = new GridLength(visible ? SideDesignWidth : 0);
-        SidePanelButton.Content = visible ? "◧" : "◨";
-        SidePanelButton.ToolTip = visible ? "Skrýt boční panel" : "Zobrazit boční panel";
+        var scale = settings.Scale;
+        if (settings.FitToScreen && designHeight > 0)
+        {
+            scale = Math.Min(scale, SystemParameters.WorkArea.Height * settings.ScreenShare / designHeight);
+        }
 
-        // Se schovaným panelem se bonusy vrátí na řádek v kartě lobby, aby o ně uživatel nepřišel.
-        viewModel.IsSidePanelVisible = visible;
-        UpdateWindowHeight();
+        return Math.Clamp(scale, TrackerSettings.MinScale, TrackerSettings.MaxScale);
+    }
+
+    /// <summary>Velikost, kterou nenastavil kód, změnil uživatel úchopem; po chvíli klidu se přepočte.</summary>
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
+    {
+        if (!IsLoaded || isCollapsed || expandedDesignHeight <= 0 ||
+            (Math.Abs(ActualWidth - expectedSize.Width) < 0.5 && Math.Abs(ActualHeight - expectedSize.Height) < 0.5))
+        {
+            return;
+        }
+
+        resizeTimer.Stop();
+        resizeTimer.Start();
     }
 
     /// <summary>
-    /// Nasadí velikost rozbaleného okna: karta dostane návrhovou výšku a okno takovou, aby ji
-    /// <c>Viewbox</c> vyplnil beze zbytku.
+    /// Z rozměru po tažení úchopem se odvodí nové zvětšení a zapíše do nastavení; okno pak
+    /// dostane přesně odpovídající výšku i šířku, aby Viewbox nenechal prázdné pruhy.
     /// </summary>
-    private void ApplyExpandedSize()
+    private void CommitUserResize()
     {
-        RootCard.Width = DesignWidth;
-        RootCard.Height = DesignHeight;
-        MinHeight = expandedMinHeight;
-        Width = expandedWidth;
-        Height = expandedHeight;
+        if (isCollapsed || expandedDesignHeight <= 0)
+        {
+            return;
+        }
+
+        var byWidth = ActualWidth / DesignWidth;
+        var byHeight = ActualHeight / expandedDesignHeight;
+        var scale = Math.Round(Math.Clamp(Math.Max(byWidth, byHeight), TrackerSettings.MinScale, TrackerSettings.MaxScale), 2);
+        if (Math.Abs(scale - settings.Scale) >= 0.01)
+        {
+            settings.Scale = scale;
+        }
+        else
+        {
+            ApplyWindowSize();
+        }
+    }
+
+    private void Settings_PropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        var all = string.IsNullOrEmpty(eventArgs.PropertyName);
+        switch (eventArgs.PropertyName)
+        {
+            case nameof(UserSettings.Theme) or nameof(UserSettings.Accent) or nameof(UserSettings.Opacity)
+                or nameof(UserSettings.ShowCardArt):
+                ThemeManager.Apply(settings.Model, Application.Current.Resources);
+                break;
+            case nameof(UserSettings.Scale) or nameof(UserSettings.FitToScreen) or nameof(UserSettings.ScreenShare):
+                ApplyWindowSize();
+                break;
+            case nameof(UserSettings.ShowDetails) or nameof(UserSettings.DetailPlacement):
+                ApplyDetailsPlacement();
+                break;
+            case nameof(UserSettings.AlwaysOnTop):
+                Topmost = settings.AlwaysOnTop;
+                break;
+        }
+
+        if (all)
+        {
+            ThemeManager.Apply(settings.Model, Application.Current.Resources);
+            Topmost = settings.AlwaysOnTop;
+            ApplyDetailsPlacement();
+        }
+
+        saveTimer.Stop();
+        saveTimer.Start();
+    }
+
+    private void SaveSettings()
+    {
+        try
+        {
+            SettingsStore.Save(settings.Model, SettingsStore.DefaultPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Nastavení, které se nedá zapsat, nesmí shodit overlay; platí do konce běhu.
+        }
     }
 
     /// <summary>
-    /// Nasadí velikost sbaleného okna, tedy pruh hlavičky. Nestačí schovat obsah: <c>Viewbox</c>
-    /// škáluje celou kartu, takže dokud má karta plnou návrhovou výšku, udělá nízké okno z celé
-    /// karty jen zdrobnělou miniaturu místo hlavičky v původní velikosti. Návrhová výška proto
-    /// musí spadnout na hlavičku, a s ní i <see cref="FrameworkElement.MinHeight" />, který by
-    /// okno na tuhle výšku vůbec nepustil.
+    /// Zapamatovaná poloha se nasadí ještě před zobrazením, aby okno nepřeskočilo. Bez ní se
+    /// okno vystředí na hlavní pracovní plochu podle návrhové velikosti; přesnou velikost
+    /// dorovná první rozvržení.
     /// </summary>
-    private void ApplyCollapsedSize(double width)
+    private void RestoreStartupPosition()
     {
-        RootCard.Width = DesignWidth;
-        RootCard.Height = HeaderDesignHeight;
+        if (settings.RememberWindowPosition && settings.Model.WindowLeft is { } left && settings.Model.WindowTop is { } top)
+        {
+            Left = left;
+            Top = top;
+            return;
+        }
 
-        // Poměr stran drží hlavičku ve stejném zvětšení, jaké mělo rozbalené okno.
-        var height = width * HeaderDesignHeight / DesignWidth;
-        MinHeight = height;
-        Width = width;
-        Height = height;
+        var work = SystemParameters.WorkArea;
+        Left = work.Left + Math.Max(0, (work.Width - Width) / 2);
+        Top = work.Top + Math.Max(0, (work.Height - Height) / 2);
+    }
+
+    private void Window_LocationChanged(object? sender, EventArgs eventArgs)
+    {
+        if (IsLoaded && WindowState == WindowState.Normal && settings.RememberWindowPosition &&
+            !double.IsNaN(Left) && !double.IsNaN(Top))
+        {
+            settings.RememberPosition(Left, Top);
+        }
     }
 
     /// <summary>Plocha všech monitorů. Okno smí být na kterémkoli z nich, ale ne mimo ně.</summary>
@@ -216,9 +310,8 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Stáhne okno zpět, když jeho hlavička skončí mimo monitory. Overlay se dá přetáhnout jen
-    /// za hlavičku, takže bez tohohle zůstane okno nedosažitelné — stane se to po odpojení
-    /// druhého monitoru, po změně rozlišení nebo když je okno vyšší než obrazovka, na které
-    /// se otevřelo, protože vystředění pak pošle horní okraj do minusu.
+    /// za hlavičku, takže bez tohohle zůstane okno nedosažitelné — po odpojení druhého monitoru,
+    /// po změně rozlišení nebo když se zapamatovaná poloha vztahuje k monitoru, který už není.
     /// </summary>
     private void EnsureOnScreen()
     {
@@ -240,13 +333,13 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Vrátí okno doprostřed hlavního monitoru v návrhové velikosti. Poslední záchrana, když
-    /// okno skončí mimo obrazovku nebo se ztratí na monitoru, který už není.
+    /// Vrátí okno doprostřed hlavního monitoru. Poslední záchrana, když okno skončí mimo
+    /// obrazovku nebo se ztratí na monitoru, který už není.
     /// </summary>
     private void ResetWindowButton_Click(object sender, RoutedEventArgs eventArgs)
     {
         WindowState = WindowState.Normal;
-        UpdateWindowHeight();
+        ApplyWindowSize();
 
         var work = SystemParameters.WorkArea;
         Left = work.Left + Math.Max(0, (work.Width - Width) / 2);
@@ -262,20 +355,9 @@ public partial class MainWindow : Window
     private void OnDisplaySettingsChanged(object? sender, EventArgs eventArgs) =>
         Dispatcher.BeginInvoke(() =>
         {
-            UpdateWindowHeight();
+            ApplyWindowSize();
             EnsureOnScreen();
         });
-
-    /// <summary>
-    /// Zvětšení pro danou návrhovou výšku. Bere se z výšky pracovní plochy, ne z počtu pixelů:
-    /// pracovní plocha už je v jednotkách nezávislých na DPI, takže se do výpočtu nezanese
-    /// zvětšení, které si Windows nastavují samy.
-    /// </summary>
-    private static double ScaleFor(double designHeight)
-    {
-        var available = SystemParameters.WorkArea.Height * WorkAreaShare;
-        return Math.Clamp(available / designHeight, MinScale, MaxScale);
-    }
 
     /// <summary>
     /// Nasadí verzi staženou při minulém běhu a uklidí po předchozí aktualizaci. Běžící proces
@@ -342,22 +424,39 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs eventArgs)
     {
-        // Teprve teď má okno skutečnou pozici. WindowStartupLocation="CenterScreen" ho vystředí
-        // na monitor s kurzorem, ale velikost se počítá z hlavní pracovní plochy, takže na menším
-        // monitoru může být okno vyšší než obrazovka a hlavička skončí nad její horní hranou.
+        // Teprve teď má karta skutečnou výšku a okno skutečnou pozici.
+        if (RootCard.ActualHeight > 0)
+        {
+            expandedDesignHeight = RootCard.ActualHeight;
+        }
+
+        ApplyWindowSize();
+        if (!settings.RememberWindowPosition || settings.Model.WindowLeft is null)
+        {
+            var work = SystemParameters.WorkArea;
+            Left = work.Left + Math.Max(0, (work.Width - Width) / 2);
+            Top = work.Top + Math.Max(0, (work.Height - Height) / 2);
+        }
+
         EnsureOnScreen();
+        if (settings.StartCollapsed && !isCollapsed)
+        {
+            ToggleCollapsed();
+        }
 
         ApplyPendingUpdate();
-        _ = CheckForUpdateAsync();
+        if (settings.CheckForUpdates)
+        {
+            _ = CheckForUpdateAsync();
+        }
+
         await media.StartAsync();
 
         var commandLineLog = ParseLogArgument(Environment.GetCommandLineArgs());
         if (commandLineLog is not null && PowerLogDiscovery.Find(commandLineLog) is { } explicitLog)
         {
             // Log z příkazové řádky se jen přehraje, pokud nepatří běžící hře. Jako živý zdroj
-            // by z něj vznikla další kopie v archivu zápasů a přepsal by checkpoint — a protože
-            // se archiv drží na pěti zápasech, vytlačily by tyhle kopie skutečně odehrané hry.
-            // Ukázat cestu k logu běžící hry je naopak legitimní, tam se živé čtení zachová.
+            // by z něj vznikla další kopie v archivu zápasů a přepsal by checkpoint.
             if (IsCurrentSessionLog(explicitLog))
             {
                 await StartLiveAsync(explicitLog, autoDiscovered: false);
@@ -369,7 +468,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            var discoveredLog = PowerLogDiscovery.Find();
+            var discoveredLog = DiscoverLog();
             if (discoveredLog is not null && IsCurrentSessionLog(discoveredLog))
             {
                 await StartLiveAsync(discoveredLog, autoDiscovered: true);
@@ -380,6 +479,11 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    /// <summary>Hledá log i v instalaci zadané v nastavení, pokud je; jinak jen na obvyklých místech.</summary>
+    private string? DiscoverLog() => settings.Model.HearthstoneDirectory is { } custom
+        ? PowerLogDiscovery.FindInRoots([custom, .. PowerLogDiscovery.InstallRoots()])
+        : PowerLogDiscovery.Find();
 
     private async void Timer_Tick(object? sender, EventArgs eventArgs)
     {
@@ -421,7 +525,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var discoveredLog = PowerLogDiscovery.Find();
+        var discoveredLog = DiscoverLog();
         if (discoveredLog is not null && IsCurrentSessionLog(discoveredLog))
         {
             await StartLiveAsync(discoveredLog, autoDiscovered: true);
@@ -487,8 +591,8 @@ public partial class MainWindow : Window
     private void PatchNotesButton_Click(object sender, RoutedEventArgs eventArgs) => PatchNotesWindow.Show(this);
 
     /// <summary>
-    /// Ovládání trackeru se schovává do menu, aby spodní lišta nezabírala celý řádek.
-    /// Menu se otevírá levým kliknutím a nad tlačítkem, protože lišta sedí u dolní hrany.
+    /// Ovládání trackeru se schovává do menu, aby patička nezabírala celý řádek. Menu se
+    /// otevírá levým kliknutím a nad tlačítkem, protože patička sedí u dolní hrany.
     /// </summary>
     private void ActionsButton_Click(object sender, RoutedEventArgs eventArgs)
     {
@@ -496,8 +600,7 @@ public partial class MainWindow : Window
         {
             menu.PlacementTarget = button;
             // Tlačítko sedí u pravého dolního rohu okna. Výchozí umístění by menu poslalo
-            // doprava mimo okno, protože na širší ploše ho WPF nemá kam odrazit, takže se
-            // menu zarovná pravou hranou k tlačítku a vyskočí nad něj.
+            // doprava mimo okno, takže se menu zarovná pravou hranou k tlačítku a vyskočí nad něj.
             menu.Placement = PlacementMode.Custom;
             menu.CustomPopupPlacementCallback = (popupSize, targetSize, offset) =>
             [
@@ -537,10 +640,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Adresář, kam si tracker ukládá dohrané zápasy.</summary>
-    private static string MatchesDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "BattlegroundsTracker",
-        "matches");
+    private static string MatchesDirectory => AppPaths.MatchesDirectory;
 
     /// <summary>
     /// Přehraje uložený zápas jen pro čtení: nic se nearchivuje a checkpoint zůstane, kde byl.
@@ -618,7 +718,7 @@ public partial class MainWindow : Window
             : name;
     }
 
-    [GeneratedRegex(@"d{8}-d{6}")]
+    [GeneratedRegex(@"\d{8}-\d{6}")]
     private static partial Regex MatchStampRegex();
 
     private async Task StartLiveAsync(string path, bool autoDiscovered)
@@ -627,10 +727,7 @@ public partial class MainWindow : Window
         matchArchive?.Dispose();
         tracker = new GameStateTracker();
         parser = new PowerLogParser();
-        var dataDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BattlegroundsTracker");
-        matchArchive = MatchLogArchive.Open(dataDirectory, path);
+        matchArchive = MatchLogArchive.Open(AppPaths.DataDirectory, path);
 
         foreach (var line in matchArchive.ReadActiveLines())
         {
@@ -648,7 +745,8 @@ public partial class MainWindow : Window
         ticksSinceDiscovery = 0;
         demoIndex = 0;
         viewModel.ModeLabel = "ŽIVĚ";
-        viewModel.SourceDescription = System.IO.Path.GetFileName(path);
+        viewModel.SourceDescription = Path.GetFileName(path);
+        viewModel.SourceTooltip = path;
         viewModel.PauseButtonText = "Pozastavit";
         viewModel.IsPauseEnabled = true;
 
@@ -684,6 +782,7 @@ public partial class MainWindow : Window
         viewModel.Update(tracker.State);
         viewModel.ModeLabel = "DEMO";
         viewModel.SourceDescription = "syntetická data";
+        viewModel.SourceTooltip = "Vestavěná ukázka bez běžící hry.";
         viewModel.PauseButtonText = "Pozastavit";
         viewModel.IsPauseEnabled = true;
         timer.Interval = TimeSpan.FromMilliseconds(180);
@@ -715,7 +814,7 @@ public partial class MainWindow : Window
     /// hře, hra neběží, nebo je nainstalovaná mimo prohledávané cesty. Tooltip proto vypíše,
     /// co se ověřilo a kde se hledalo, aby to uživatel poznal bez ptaní.
     /// </summary>
-    private static string ListeningDiagnosis()
+    private string ListeningDiagnosis()
     {
         var lines = new List<string> { "Power.log aktuální relace hry jsem nenašel." };
 
@@ -755,7 +854,14 @@ public partial class MainWindow : Window
             ? "• Adresář Logs jsem našel v: " + string.Join(", ", withLogs)
             : $"• Ani v jedné z {roots.Count} prohledaných instalací není adresář Logs.");
 
-        lines.Add("• Vlastní cestu k logu lze vybrat v menu tlačítkem Vybrat log.");
+        if (settings.Model.HearthstoneDirectory is { } custom)
+        {
+            lines.Add(Directory.Exists(Path.Combine(custom, "Logs"))
+                ? $"• Instalace z nastavení: {custom}."
+                : $"• Instalace z nastavení {custom} nemá adresář Logs.");
+        }
+
+        lines.Add("• Vlastní cestu k logu lze vybrat v menu tlačítkem Vybrat log, instalaci hry v nastavení.");
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -776,7 +882,7 @@ public partial class MainWindow : Window
             return null;
         }
 
-        var discovered = PowerLogDiscovery.Find();
+        var discovered = DiscoverLog();
         return discovered is not null &&
                !discovered.Equals(liveReader.Path, StringComparison.OrdinalIgnoreCase) &&
                IsCurrentSessionLog(discovered)
@@ -787,7 +893,11 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs eventArgs)
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        settings.PropertyChanged -= Settings_PropertyChanged;
         timer.Stop();
+        saveTimer.Stop();
+        resizeTimer.Stop();
+        SaveSettings();
         updates.Cancel();
         media.Updated -= Media_Updated;
         media.Dispose();
@@ -836,39 +946,17 @@ public partial class MainWindow : Window
     /// <summary>
     /// Sbalí overlay na pruh hlavičky, nebo ho vrátí do plné velikosti. Hlavička musí zůstat
     /// vidět v původní velikosti: je to jediné místo, kterým se okno chytá a přetahuje, a taky
-    /// jediná cesta zpátky.
+    /// jediná cesta zpátky. Sbalená hlavička je celá karta, takže se zakulatí i dole.
     /// </summary>
     private void ToggleCollapsed()
     {
-        if (!isCollapsed)
-        {
-            // Ruční změna velikosti se má po rozbalení vrátit tam, kde byla.
-            expandedWidth = ActualWidth;
-            expandedHeight = ActualHeight;
-            expandedMinHeight = MinHeight;
-        }
-
         isCollapsed = !isCollapsed;
         ContentPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
         ResizeMode = isCollapsed ? ResizeMode.NoResize : ResizeMode.CanResizeWithGrip;
-        CollapseButton.Content = isCollapsed ? "□" : "−";
+        CollapseGlyph.Text = isCollapsed ? "" : "";
         CollapseButton.ToolTip = isCollapsed ? "Rozbalit overlay" : "Sbalit overlay";
-
-        // Sbalená hlavička je celá karta, takže se zakulatí i dole.
-        HeaderCard.CornerRadius = isCollapsed
-            ? new CornerRadius(11)
-            : new CornerRadius(11, 11, 0, 0);
-
-        if (isCollapsed)
-        {
-            ApplyCollapsedSize(expandedWidth);
-        }
-        else
-        {
-            ApplyExpandedSize();
-        }
-
-        EnsureOnScreen();
+        HeaderCard.CornerRadius = isCollapsed ? new CornerRadius(9) : new CornerRadius(9, 9, 0, 0);
+        ApplyWindowSize();
     }
 
     private static string? ParseLogArgument(string[] arguments)

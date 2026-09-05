@@ -9,6 +9,24 @@ namespace Tracker.Desktop;
 
 public sealed class MainViewModel : INotifyPropertyChanged
 {
+    /// <summary>Výška řádku lobby v návrhových jednotkách pro obě hustoty.</summary>
+    private const double CompactLobbyRow = 22;
+    private const double ComfortableLobbyRow = 30;
+
+    /// <summary>Kolik místa si rezervuje jedna událost, aby seznam neposkakoval.</summary>
+    private const double EventRowHeight = 16;
+
+    private readonly UserSettings settings;
+    private TrackerState? lastState;
+    private bool isMediaVisible;
+    private bool isDuos;
+    private string handTitle = "RUKA";
+    private double lobbyRowHeight = CompactLobbyRow;
+    private double lobbyMinHeight = 8 * (CompactLobbyRow + 2);
+    private bool showInlineBattleTag = true;
+    private bool showBattleTagLine;
+    private double eventsMinHeight = 5 * EventRowHeight;
+    private double eventsMaxHeight = 5 * EventRowHeight * 2;
     private string gameStatus = "Čekání";
     private string turn = "—";
     private string phase = "čekání";
@@ -85,12 +103,49 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool canMediaPrevious;
     private readonly Dictionary<int, MinionViewModel[]> boardCache = [];
 
+    public MainViewModel(UserSettings settings)
+    {
+        this.settings = settings;
+        settings.PropertyChanged += (_, _) => ApplySettings();
+        ApplySettings();
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Nastavení pro vazby v XAML: viditelnost sekcí se řídí přímo z něj.</summary>
+    public UserSettings Settings => settings;
 
     public ObservableCollection<ParticipantViewModel> Participants { get; } = [];
     public ObservableCollection<MinionViewModel> PlayerBoard { get; } = [];
     public ObservableCollection<MinionViewModel> OpposingBoard { get; } = [];
+    public ObservableCollection<MinionViewModel> Hand { get; } = [];
     public ObservableCollection<string> Events { get; } = [];
+
+    /// <summary>Nadpis sekce s rukou i s počtem karet, například <c>RUKA · 3</c>.</summary>
+    public string HandTitle { get => handTitle; private set => Set(ref handTitle, value); }
+
+    /// <summary>Režim Duos; v hlavičce se ukáže štítek.</summary>
+    public bool IsDuos { get => isDuos; private set => Set(ref isDuos, value); }
+
+    /// <summary>Výška řádku lobby podle zvolené hustoty.</summary>
+    public double LobbyRowHeight { get => lobbyRowHeight; private set => Set(ref lobbyRowHeight, value); }
+
+    /// <summary>Místo pro osm řádků lobby, aby tabulka při plnění neposkakovala.</summary>
+    public double LobbyMinHeight { get => lobbyMinHeight; private set => Set(ref lobbyMinHeight, value); }
+
+    /// <summary>Kompaktní řádek: BattleTag hned za hrdinou.</summary>
+    public bool ShowInlineBattleTag { get => showInlineBattleTag; private set => Set(ref showInlineBattleTag, value); }
+
+    /// <summary>Pohodlný řádek: BattleTag na druhém řádku pod hrdinou.</summary>
+    public bool ShowBattleTagLine { get => showBattleTagLine; private set => Set(ref showBattleTagLine, value); }
+
+    public double EventsMinHeight { get => eventsMinHeight; private set => Set(ref eventsMinHeight, value); }
+
+    /// <summary>Strop seznamu událostí; delší zalomené texty se pak scrollují místo růstu okna.</summary>
+    public double EventsMaxHeight { get => eventsMaxHeight; private set => Set(ref eventsMaxHeight, value); }
+
+    /// <summary>Proužek s hudbou: něco hraje a uživatel ho nevypnul.</summary>
+    public bool IsMediaVisible { get => isMediaVisible; private set => Set(ref isMediaVisible, value); }
 
     public string GameStatus { get => gameStatus; private set => Set(ref gameStatus, value); }
     public string Turn { get => turn; private set => Set(ref turn, value); }
@@ -281,6 +336,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         MediaSubtitle = playing.Subtitle;
         MediaArt = art;
         HasMedia = playing.HasTrack;
+        IsMediaVisible = hasMedia && settings.ShowMedia;
         MediaPlayGlyph = playing.IsPlaying ? PauseGlyph : PlayGlyph;
         MediaPlayTooltip = playing.IsPlaying ? "Pozastavit hudbu" : "Přehrát hudbu";
         CanMediaPlayPause = playing.CanPlayPause;
@@ -288,8 +344,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
         CanMediaPrevious = playing.CanSkipPrevious;
     }
 
+    /// <summary>
+    /// Přenese změnu nastavení do odvozených hodnot a překreslí poslední známý stav, aby se
+    /// třeba jiný počet událostí nebo hustota lobby projevily hned, ne až s dalším řádkem logu.
+    /// </summary>
+    private void ApplySettings()
+    {
+        IsSidePanelVisible = settings.ShowDetails;
+        var compact = settings.LobbyDensity == LobbyDensity.Compact;
+        LobbyRowHeight = compact ? CompactLobbyRow : ComfortableLobbyRow;
+        LobbyMinHeight = 8 * (LobbyRowHeight + 2);
+        ShowInlineBattleTag = compact && settings.ShowBattleTags;
+        ShowBattleTagLine = !compact && settings.ShowBattleTags;
+        EventsMinHeight = settings.EventCount * EventRowHeight;
+        EventsMaxHeight = settings.EventCount * EventRowHeight * 2;
+        IsMediaVisible = hasMedia && settings.ShowMedia;
+        if (lastState is not null)
+        {
+            Update(lastState);
+        }
+    }
+
     public void Update(TrackerState state)
     {
+        lastState = state;
         var standings = state.Standings;
 
         GameStatus = state.IsGameActive ? "Hra probíhá" : state.GamesSeen == 0 ? "Čekání" : "Hra skončila";
@@ -311,6 +389,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         PlayerBoardTitle = AreBoardsCollapsed ? "DESKY (skryto)" : boardOwnerTitle;
         OpposingBoardTitle = OpposingTitle(state);
         GameMode = state.IsDuos ? "DUOS" : "SÓLO";
+        IsDuos = state.IsDuos;
         Result = state.FinalPlace is { } finalPlace
             ? $"{finalPlace}. místo"
             : TranslateResult(state.Result);
@@ -337,7 +416,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         Sync(PlayerBoard, [.. state.PlayerBoard.Select(MinionViewModel.From)]);
         Sync(OpposingBoard, [.. (state.IsCombatPhase ? state.OpponentBoard : state.Shop).Select(MinionViewModel.From)]);
-        Sync(Events, [.. state.RecentEvents.Reverse()]);
+        Sync(Hand, [.. state.Hand.Select(MinionViewModel.From)]);
+        HandTitle = Hand.Count > 0 ? $"RUKA · {Hand.Count}" : "RUKA";
+        Sync(Events, [.. state.RecentEvents.Reverse().Take(settings.EventCount)]);
     }
 
     /// <summary>
