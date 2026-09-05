@@ -9,7 +9,7 @@
   <!-- Jediné místo, kde se verze a autorství udržují. Odsud je dědí AssemblyVersion,
        FileVersion i InformationalVersion, takže sedí v UI i ve vlastnostech souboru .exe. -->
   <PropertyGroup>
-    <VersionPrefix>0.12.0</VersionPrefix>
+    <VersionPrefix>0.13.0</VersionPrefix>
     <Product>Battlegrounds Tracker</Product>
     <Authors>Michal Jašek</Authors>
     <Company>Michal Jašek</Company>
@@ -17,7 +17,7 @@
   </PropertyGroup>
 
   <!--
-    Každý build, který neprošel vydáním, se označí jako 0.12.0-dev. Podmínka je na Version,
+    Každý build, který neprošel vydáním, se označí jako 0.13.0-dev. Podmínka je na Version,
     ne na Configuration, a to záměrně: Configuration tady ještě nemusí být dosazená, protože
     Directory.Build.props se vyhodnocuje před výchozími hodnotami SDK. Build bez -c pak značku
     nedostal a tvářil se jako vydaná verze. Version naopak zadává jen vydání

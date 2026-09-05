@@ -309,6 +309,26 @@
                             <Grid Style="{StaticResource RowStyle}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Historie zápasů" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Hrdina, umístění a datum posledních zápasů, zvlášť sólo a Duos. MMR doplníte do řádku a tracker spočítá změnu i aktuální zůstatek; hra ho do logů nepíše." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding ShowHistory}" />
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}" IsEnabled="{Binding ShowHistory}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="18,0,14,0">
+                                    <TextBlock Text="Zápasů v historii" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Kolik posledních zápasů zvoleného režimu je vidět." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Slider Style="{StaticResource SliderStyle}" Width="120" Minimum="3" Maximum="10"
+                                            Value="{Binding HistoryCount, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding HistoryCount}" Style="{StaticResource SliderValueStyle}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
                                     <TextBlock Text="Hudba" Style="{StaticResource RowLabelStyle}" />
                                     <TextBlock Text="Proužek s tím, co právě hraje ve Spotify, prohlížeči nebo přehrávači." Style="{StaticResource RowHintStyle}" />
                                 </StackPanel>
@@ -366,6 +386,19 @@
                                 <TextBox Text="{Binding HearthstoneDirectory, UpdateSourceTrigger=LostFocus}" />
                                 <Button Grid.Column="1" Content="Vybrat…" Margin="6,0,0,0" Padding="10,4" Click="BrowseButton_Click" />
                                 <Button Grid.Column="2" Content="Vymazat" Margin="6,0,0,0" Padding="10,4" Click="ClearDirectoryButton_Click" />
+                            </Grid>
+
+                            <Grid Style="{StaticResource RowStyle}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                                    <TextBlock Text="Uložené zápasy k přehrání" Style="{StaticResource RowLabelStyle}" />
+                                    <TextBlock Text="Kolik dohraných zápasů zůstává v archivu pro Vybrat log. Zabalený zápas má zhruba 2 až 3 MB; starší se mažou při dalším dohraném zápase. Historie zápasů na tom nezávisí." Style="{StaticResource RowHintStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Slider Style="{StaticResource SliderStyle}" Width="150" Minimum="1" Maximum="200"
+                                            Value="{Binding RetainedMatches, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding RetainedMatches}" Style="{StaticResource SliderValueStyle}" />
+                                </StackPanel>
                             </Grid>
 
                             <TextBlock Text="Složka dat" Style="{StaticResource RowLabelStyle}" />

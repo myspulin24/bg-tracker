@@ -51,6 +51,10 @@ public sealed class TrackerSettings
     public const double MaxScreenShare = 0.98;
     public const int MinEventCount = 2;
     public const int MaxEventCount = 6;
+    public const int MinRetainedMatches = 1;
+    public const int MaxRetainedMatches = 200;
+    public const int MinHistoryCount = 3;
+    public const int MaxHistoryCount = 10;
 
     /// <summary>Tmavý základ je výchozí: overlay leží nad hrou, která je sama tmavá.</summary>
     public ThemeMode Theme { get; set; } = ThemeMode.Dark;
@@ -84,6 +88,21 @@ public sealed class TrackerSettings
     public bool ShowEvents { get; set; } = true;
     public int EventCount { get; set; } = 5;
     public bool ShowMedia { get; set; } = true;
+
+    /// <summary>Historie dohraných zápasů s MMR.</summary>
+    public bool ShowHistory { get; set; } = true;
+
+    /// <summary>Kolik posledních zápasů historie ukazuje.</summary>
+    public int HistoryCount { get; set; } = 5;
+
+    /// <summary>Přepínač historie: sólo, nebo Duos. Pamatuje se, aby se po startu neskákalo.</summary>
+    public bool HistoryDuos { get; set; }
+
+    /// <summary>
+    /// Kolik dohraných zápasů se drží v archivu k přehrání. Zabalený zápas má zhruba 2 až 3 MB,
+    /// takže i dvě stě zápasů je pod půl gigabajtu.
+    /// </summary>
+    public int RetainedMatches { get; set; } = MatchLogArchive.DefaultRetainedMatches;
     public LobbyDensity LobbyDensity { get; set; } = LobbyDensity.Compact;
 
     /// <summary>Kresby karet se stahují z internetu; kdo to nechce, vidí kartičky bez obrázku.</summary>
@@ -109,6 +128,8 @@ public sealed class TrackerSettings
         Scale = Clamp(Scale, MinScale, MaxScale, 1.0);
         ScreenShare = Clamp(ScreenShare, MinScreenShare, MaxScreenShare, 0.85);
         EventCount = Math.Clamp(EventCount, MinEventCount, MaxEventCount);
+        HistoryCount = Math.Clamp(HistoryCount, MinHistoryCount, MaxHistoryCount);
+        RetainedMatches = Math.Clamp(RetainedMatches, MinRetainedMatches, MaxRetainedMatches);
         if (!Enum.IsDefined(Theme))
         {
             Theme = ThemeMode.Dark;

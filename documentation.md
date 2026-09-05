@@ -632,8 +632,15 @@ entit; desktopová tabulka ale používá pouze `LobbyParticipants`.
 
 Datový model má `LobbyParticipant.Mmr`. V celém pozorovaném logu se nevyskytuje jediný
 řetězec `rating` ani `mmr` a žádný tag této hodnotě neodpovídá. Sloupec MMR byl proto
-z UI odstraněn a nahrazen počtem triplů. Budoucí implementace musí nejprve doložit zdroj
-z logu nebo jiného povoleného lokálního API.
+z UI odstraněn a nahrazen počtem triplů.
+
+Prohledané byly 5. 9. 2026 i ostatní logy hry z adresáře relace (`Hearthstone.log`,
+`GameNetLogger.log`, `LoadingScreen.log`, `Achievements.log`, `Gameplay.log`, `Asset.log`,
+`LuckyDraw.log`) a Unity `Player.log` v `%USERPROFILE%\AppData\LocalLow\Blizzard
+Entertainment\Hearthstone`. Jediné zásahy na `rating` jsou chybové hlášky o DBF; rating
+Battlegrounds hra do žádného logu nepíše. Jiné trackery ho čtou z paměti procesu hry
+(HearthMirror), což tento tracker záměrně nedělá. MMR proto doplňuje uživatel v historii
+zápasů (11.3c) a tracker z něj počítá změny a aktuální zůstatek.
 
 ### 9.6 GameState je stav, PowerTaskList je animace
 
@@ -808,6 +815,7 @@ hry.
 ```text
 %LOCALAPPDATA%\BattlegroundsTracker\
   settings.json                              (uživatelské nastavení, viz 11.7)
+  history.json                               (historie zápasů s MMR, viz 11.3c)
   checkpoint.json
   matches\
     match-yyyyMMdd-HHmmss-fff.power.log.br     (dohraný, zabalený)
@@ -849,9 +857,12 @@ protože objem tvoří `GameState` řádky, které se stejně potřebují. Se za
 1,70 MB proti 2,22 MB. Za půl megabajtu na zápas nestojí za to přijít o možnost archiv znovu
 přečíst vylepšeným parserem — dnes ignorovaný řádek může zítra nést informaci navíc.
 
-Drží se posledních `MatchLogArchive.RetainedMatches` dohraných zápasů, tedy pět. Ořez i dobalení
+Drží se posledních `RetainedMatches` dohraných zápasů; výchozí je pět
+(`MatchLogArchive.DefaultRetainedMatches`), v nastavení jde zvolit 1 až 200. Ořez i dobalení
 pozůstalých prostých logů proběhnou při otevření archivu, takže se složka srovná i po
-aktualizaci ze starší verze nebo po pádu aplikace.
+aktualizaci ze starší verze nebo po pádu aplikace; snížení retence za běhu ořeže složku hned.
+Historie zápasů (`history.json`) na retenci nezávisí, takže záznam zápasu zůstane, i když jeho
+log už není k přehrání.
 
 Čtení řeší `MatchLogArchive.ReadMatch`, které pozná zabalený soubor podle přípony. Volající
 tak nemusí vědět, v jakém stavu zápas je.
@@ -1007,8 +1018,10 @@ Pod hlavičkou jdou sekce nad sebou; každá se dá v nastavení vypnout a vět�
 5. **Detaily** – bonusy pro celou hru, bonusy na kartách, trinkety a ekonomika krčmy; buď ve
    sloupci vpravo, nebo pod hlavním sloupcem (11.3a).
 6. **Události** – dvě až šest posledních událostí.
-7. Pruhy, které se ukazují jen občas: aktualizace, načítání zápasu a hudba (11.3b).
-8. **Patička** – stav a výsledek, po najetí diagnostika parseru; vpravo patch notes a menu
+7. **Historie** – poslední zápasy zvoleného režimu s hrdinou, umístěním, změnou MMR
+   a zůstatkem MMR, přepínač sólo/Duos a štítek s aktuálním MMR (11.3c).
+8. Pruhy, které se ukazují jen občas: aktualizace, načítání zápasu a hudba (11.3b).
+9. **Patička** – stav a výsledek, po najetí diagnostika parseru; vpravo patch notes a menu
    s ovládáním.
 
 Stejné grid šířky používá hlavička tabulky i každý datový řádek, proto jsou hodnoty přesně
@@ -1204,6 +1217,37 @@ neotevře, proužek se jen neobjeví.
 Kvůli WinRT má `Tracker.Desktop` cíl `net8.0-windows10.0.19041.0`. Nejnižší podporovaná
 verze systému je tím Windows 10 verze 2004 a vydaná binárka roste o 6 MiB.
 
+### 11.3c Historie zápasů a MMR
+
+Sekce `HISTORIE` ukazuje posledních tři až deset zápasů (výchozí pět) zvoleného režimu,
+nejnovější první: datum, hrdinu (v Duos i spoluhráče), umístění, změnu MMR a zůstatek MMR.
+Přepínač `SOLO` / `DUOS` se pamatuje v nastavení, aby po startu neskákal, a štítek v nadpisu
+nese aktuální MMR zvoleného režimu. Umístění je zlaté za první místo, zelené za horní
+polovinu; změna MMR zelená za zisk, červená za ztrátu.
+
+Zápas se do historie zapíše ve chvíli, kdy hra skončí při běžícím trackeru: `MatchRecorder`
+pozná přechod z rozehrané hry do ukončené a ještě před uzavřením archivu složí
+`MatchRecord` ze stavu trackeru (`MatchHistory.FromState`): hrdina a jeho karta, umístění
+z `FinalPlace`, režim, počet kol, čas konce. Identifikátorem je jméno archivu zápasu
+(`match-yyyyMMdd-HHmmss-fff`), takže záznam a log k přehrání patří k sobě a tentýž zápas se
+nezapíše dvakrát, ani když se po restartu trackeru dohraný zápas obnoví z archivu. Hra, která
+se nedostala do prvního kola, se nezapisuje; to je odchod z lobby při výběru hrdiny. Zápasy
+dohrané bez běžícího trackeru v jiné relaci hry se nezapíšou vůbec, protože se jejich log
+nečte.
+
+MMR hra do logů nepíše (9.5). Pole v posledním sloupci je proto editovatelné: uživatel do něj
+opíše zůstatek, který mu hra ukázala, a potvrdí Enterem nebo opuštěním pole; Escape vrátí
+původní hodnotu, prázdné pole zůstatek smaže. Změna se počítá jako rozdíl proti nejbližšímu
+předchozímu zápasu téhož režimu se známým zůstatkem, takže doplnění jednoho čísla přepočítá
+i řádek pod ním, a sólo a Duos se nemíchají. Aktuální MMR je zůstatek z posledního zápasu, kde
+je doplněný.
+
+Historie leží v `history.json` ve složce dat, ukládá se hned při každé změně přes dočasný
+soubor a drží nejvýš `MatchHistory.Capacity` (500) záznamů. Na retenci archivu nezávisí:
+i když se log zápasu už dávno smazal, jeho řádek v historii zůstává. Řádky ve view modelu
+porovnávají obsah (`Equals`), aby `Sync` nepřepisoval nezměněné řádky a nezavíral právě
+editované pole; po zápisu MMR se řádek nahradí novým, protože se změnil.
+
 ### 11.4 Aktualizace kolekcí
 
 `MainViewModel` kolekce nepřepisuje přes `Clear` a znovunaplnění, ale porovnává je položku
@@ -1325,9 +1369,9 @@ vpravo řádky „popis vlevo, ovládací prvek vpravo“:
 | stránka | co nastavuje |
 | --- | --- |
 | Vzhled | motiv (tmavý, světlý), akcent (šest barev), krytí okna 50 až 100 %, zvětšení 60 až 160 %, strop podle výšky obrazovky a jeho podíl, hustota lobby, kresby karet |
-| Rozložení | přehled, lobby (řádek s dalším soupeřem, typy minionů, BattleTagy), desky, ruka, detaily a jejich umístění, události a jejich počet, hudba |
+| Rozložení | přehled, lobby (řádek s dalším soupeřem, typy minionů, BattleTagy), desky, ruka, detaily a jejich umístění, události a jejich počet, historie a počet zápasů v ní, hudba |
 | Chování | vždy navrchu, pamatovat polohu okna, spouštět sbalené, kontrolovat aktualizace |
-| Data | instalace Hearthstonu mimo obvyklé cesty, složka dat s tlačítkem do Průzkumníka, co aplikace posílá na síť |
+| Data | instalace Hearthstonu mimo obvyklé cesty, počet uložených zápasů k přehrání (1 až 200), složka dat s tlačítkem do Průzkumníka, co aplikace posílá na síť |
 
 Formulář je svázaný přímo s `UserSettings`, obalem nad `TrackerSettings` z Core, který
 každou změnu ohlásí. Hlavní okno na ni reaguje hned: motiv a akcent přes `ThemeManager`,
@@ -1569,7 +1613,7 @@ pro jednoho kamaráda se nevyplatí.
 
 ## 15. Automatické testy a dosavadní validace
 
-Test suite aktuálně obsahuje sto dvacet dva testů.
+Test suite aktuálně obsahuje sto dvacet devět testů.
 
 Původní čtyři:
 
@@ -1635,13 +1679,20 @@ cizích klíčů a doplnění chybějících, a srovnání hodnot mimo rozsah. J
 ověřuje, že složku dat přesměruje proměnná `BGTRACKER_DATA_DIR` a bez ní zůstává pod
 LOCALAPPDATA.
 
+Šest v `MatchHistoryTests` pokrývá historii zápasů: zápis dohraného zápasu ze stavu
+trackeru přes `MatchRecorder`, vynechání hry bez prvního kola, změny MMR počítané zvlášť
+v sólu a v Duos i aktuální MMR, výběr posledních zápasů jednoho režimu, dedupliaci podle
+identifikátoru s uložením a načtením včetně poškozeného souboru, a identifikátor ze jména
+archivu. `MatchLogArchiveTests` navíc ověřují nastavitelnou retenci: archiv drží tolik
+zápasů, kolik dostane, a snížení za běhu ořeže složku hned.
+
 Dva v `MatchLogArchiveTests` pokrývají kompresi: zabalení dohraného zápasu se zachováním
 obsahu i řádovým zmenšením a dobalení pozůstalých prostých logů s ořezem retence.
 
 Čtrnáct v `StatFormatTests` pokrývá zkrácený zápis statistik: hranice tisíce, desetinu jen do
 deseti tisíc, zaokrouhlování vždy dolů a zástupný znak u neznámé hodnoty.
 
-Poslední ověřený build prošel s 0 warnings a 0 errors; všech 122 testů prošlo.
+Poslední ověřený build prošel s 0 warnings a 0 errors; všech 129 testů prošlo.
 `dotnet format --verify-no-changes` je bez nálezu.
 
 Vedle jednotkových testů proběhlo živé ověření na reálné Battlegrounds hře:
@@ -1711,6 +1762,10 @@ Overlay byl proti témuž logu spuštěn a zkontrolován snímkem obrazovky, vč
 18. **Poškozený `settings.json` se potichu nahradí výchozími hodnotami.** Stačí jedna
     neplatná hodnota výčtu a celý soubor se zahodí; aplikace o tom nic neřekne, jen se otevře
     ve výchozím vzhledu.
+18a. **MMR se nečte z hry.** Žádný log hry ho neobsahuje (9.5), takže ho uživatel opisuje do
+    historie ručně; bez toho zůstane změna i zůstatek prázdný. Automatické čtení by
+    znamenalo číst paměť procesu hry jako HearthMirror, což je mimo záměr trackeru.
+    Zápasy dohrané bez běžícího trackeru v jiné relaci hry se do historie nedostanou.
 19. **Jména spoluhráčů v Duos nejsou vždy k mání.** Log pojmenuje jen hráče, jejichž entita
     se v něm objevila; ostatní zůstanou jako `Skrytý hráč`. Vlastní spoluhráč jméno nedostane
     nikdy, protože jeho hrdinu hra věší na entitu lokálního hráče. Jeho deska se ukládá jen

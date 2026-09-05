@@ -153,6 +153,37 @@ public sealed class MatchLogArchiveTests
     }
 
     [Fact]
+    public void KeepsAsManyMatchesAsTheCallerAsksFor()
+    {
+        var testDirectory = Path.Combine(Path.GetTempPath(), $"tracker-retention-{Guid.NewGuid():N}");
+        var dataDirectory = Path.Combine(testDirectory, "data");
+        var matchesDirectory = Path.Combine(dataDirectory, "matches");
+        var sourcePath = Path.Combine(testDirectory, "Power.log");
+
+        try
+        {
+            Directory.CreateDirectory(matchesDirectory);
+            File.WriteAllText(sourcePath, "x");
+            for (var index = 0; index < 50; index++)
+            {
+                File.WriteAllText(Path.Combine(matchesDirectory, $"match-20260901-{index:D6}-000.power.log.br"), "x");
+            }
+
+            using var archive = MatchLogArchive.Open(dataDirectory, sourcePath, retainedMatches: 40);
+
+            Assert.Equal(40, archive.RetainedMatches);
+            Assert.Equal(40, Directory.GetFiles(matchesDirectory, "*.power.log.br").Length);
+        }
+        finally
+        {
+            if (Directory.Exists(testDirectory))
+            {
+                Directory.Delete(testDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void PacksLeftoverPlainLogsAndKeepsOnlyTheNewestMatches()
     {
         var testDirectory = Path.Combine(Path.GetTempPath(), $"tracker-prune-{Guid.NewGuid():N}");
@@ -166,7 +197,7 @@ public sealed class MatchLogArchiveTests
             File.WriteAllText(sourcePath, "x");
 
             // Zápasy z verze před kompresí; jejich jména nesou čas, takže se řadí abecedně.
-            for (var index = 0; index < MatchLogArchive.RetainedMatches + 5; index++)
+            for (var index = 0; index < MatchLogArchive.DefaultRetainedMatches + 5; index++)
             {
                 File.WriteAllText(
                     Path.Combine(matchesDirectory, $"match-2026090{index / 10}-{index:D6}-000.power.log"),
@@ -177,12 +208,16 @@ public sealed class MatchLogArchiveTests
 
             Assert.Empty(Directory.GetFiles(matchesDirectory, "*.power.log"));
             var kept = Directory.GetFiles(matchesDirectory, "*.power.log.br").Order().ToArray();
-            Assert.Equal(MatchLogArchive.RetainedMatches, kept.Length);
+            Assert.Equal(MatchLogArchive.DefaultRetainedMatches, kept.Length);
 
             // Smazalo se pět nejstarších, nejnovější zůstal a jde přečíst.
             Assert.Equal(
-                [$"zápas {MatchLogArchive.RetainedMatches + 4}"],
+                [$"zápas {MatchLogArchive.DefaultRetainedMatches + 4}"],
                 MatchLogArchive.ReadMatch(kept[^1]));
+
+            // Retence je nastavitelná: snížení ořeže složku hned.
+            archive.RetainedMatches = 2;
+            Assert.Equal(2, Directory.GetFiles(matchesDirectory, "*.power.log.br").Length);
         }
         finally
         {

@@ -17,8 +17,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private const double EventRowHeight = 16;
 
     private readonly UserSettings settings;
+    private readonly MatchHistory history;
     private TrackerState? lastState;
     private bool isMediaVisible;
+    private string currentMmr = "MMR —";
+    private bool hasNoHistory = true;
+    private double historyMinHeight = 5 * 24;
     private bool isDuos;
     private string handTitle = "RUKA";
     private double lobbyRowHeight = CompactLobbyRow;
@@ -103,10 +107,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool canMediaPrevious;
     private readonly Dictionary<int, MinionViewModel[]> boardCache = [];
 
-    public MainViewModel(UserSettings settings)
+    public MainViewModel(UserSettings settings, MatchHistory history)
     {
         this.settings = settings;
+        this.history = history;
         settings.PropertyChanged += (_, _) => ApplySettings();
+        history.Changed += (_, _) => RefreshHistory();
         ApplySettings();
     }
 
@@ -146,6 +152,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     /// <summary>Proužek s hudbou: něco hraje a uživatel ho nevypnul.</summary>
     public bool IsMediaVisible { get => isMediaVisible; private set => Set(ref isMediaVisible, value); }
+
+    /// <summary>Posledních několik zápasů zvoleného režimu, nejnovější první.</summary>
+    public ObservableCollection<MatchHistoryRowViewModel> HistoryRows { get; } = [];
+
+    /// <summary>Aktuální MMR zvoleného režimu, tedy zůstatek z posledního zápasu, kde je doplněný.</summary>
+    public string CurrentMmr { get => currentMmr; private set => Set(ref currentMmr, value); }
+
+    public bool HasNoHistory { get => hasNoHistory; private set => Set(ref hasNoHistory, value); }
+
+    /// <summary>Místo pro zvolený počet řádků historie, aby sekce při plnění neposkakovala.</summary>
+    public double HistoryMinHeight { get => historyMinHeight; private set => Set(ref historyMinHeight, value); }
+
+    /// <summary>Přepínač historie; oba přepínače jsou svázané na totéž nastavení.</summary>
+    public bool IsDuosHistory
+    {
+        get => settings.HistoryDuos;
+        set
+        {
+            if (settings.HistoryDuos != value)
+            {
+                settings.HistoryDuos = value;
+                Raise(nameof(IsDuosHistory));
+                Raise(nameof(IsSoloHistory));
+            }
+        }
+    }
+
+    public bool IsSoloHistory
+    {
+        get => !settings.HistoryDuos;
+        set => IsDuosHistory = !value;
+    }
 
     public string GameStatus { get => gameStatus; private set => Set(ref gameStatus, value); }
     public string Turn { get => turn; private set => Set(ref turn, value); }
@@ -359,11 +397,35 @@ public sealed class MainViewModel : INotifyPropertyChanged
         EventsMinHeight = settings.EventCount * EventRowHeight;
         EventsMaxHeight = settings.EventCount * EventRowHeight * 2;
         IsMediaVisible = hasMedia && settings.ShowMedia;
+        HistoryMinHeight = settings.HistoryCount * 24;
+        RefreshHistory();
         if (lastState is not null)
         {
             Update(lastState);
         }
     }
+
+    /// <summary>
+    /// Přestaví řádky historie podle zvoleného režimu a počtu. Změnu MMR počítá historie sama
+    /// proti předchozímu zápasu téhož režimu, takže doplnění jednoho zůstatku přepočítá i řádek
+    /// pod ním.
+    /// </summary>
+    private void RefreshHistory()
+    {
+        var duos = settings.HistoryDuos;
+        var rows = history.Latest(duos, settings.HistoryCount)
+            .Select(record => new MatchHistoryRowViewModel(record, history.ChangeFor(record), CommitMmr))
+            .ToArray();
+        Sync(HistoryRows, rows);
+        HasNoHistory = rows.Length == 0;
+        CurrentMmr = history.CurrentMmr(duos) is { } mmr
+            ? $"MMR {mmr.ToString("N0", CultureInfo.GetCultureInfo("cs-CZ"))}"
+            : "MMR —";
+        Raise(nameof(IsDuosHistory));
+        Raise(nameof(IsSoloHistory));
+    }
+
+    private void CommitMmr(string id, int? mmr) => history.SetMmr(id, mmr);
 
     public void Update(TrackerState state)
     {
@@ -748,6 +810,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static string FirstUpper(string value) => string.IsNullOrEmpty(value)
         ? value
         : char.ToUpperInvariant(value[0]) + value[1..];
+
+    private void Raise(string propertyName) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     private void Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

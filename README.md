@@ -84,7 +84,11 @@ Pilot umí:
   a blood gemy a jaký plošný buff mají elementálové a piráti;
 - sledovat zlato, cenu upgradu tavernu, dalšího soupeře a historii soubojů;
 - zobrazit poslední významné události a diagnostiku parseru;
-- přehrát uložený log nebo vestavěnou syntetickou ukázku;
+- vést historii posledních zápasů zvlášť pro sólo a Duos: hrdina, umístění, změna MMR
+  a zůstatek MMR. Rating hra do logů nepíše, takže se zůstatek po zápase opíše do řádku
+  a tracker spočítá změnu i aktuální MMR;
+- přehrát uložený log nebo vestavěnou syntetickou ukázku; počet uložených zápasů je
+  v nastavení (1 až 200);
 - přizpůsobit se v nastavení: tmavý nebo světlý motiv, šest akcentů, krytí a zvětšení okna,
   zapínání jednotlivých sekcí, umístění detailů vpravo nebo dole, počet událostí, hustota
   lobby, vždy navrchu, pamatování polohy a instalace hry mimo obvyklé cesty. Nastavení se

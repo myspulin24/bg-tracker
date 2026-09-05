@@ -38,6 +38,10 @@ public sealed class UserSettings : INotifyPropertyChanged
     public bool ShowEvents { get => Model.ShowEvents; set => Set(Model.ShowEvents, value, next => Model.ShowEvents = next); }
     public int EventCount { get => Model.EventCount; set => Set(Model.EventCount, value, next => Model.EventCount = next); }
     public bool ShowMedia { get => Model.ShowMedia; set => Set(Model.ShowMedia, value, next => Model.ShowMedia = next); }
+    public bool ShowHistory { get => Model.ShowHistory; set => Set(Model.ShowHistory, value, next => Model.ShowHistory = next); }
+    public int HistoryCount { get => Model.HistoryCount; set => Set(Model.HistoryCount, value, next => Model.HistoryCount = next); }
+    public bool HistoryDuos { get => Model.HistoryDuos; set => Set(Model.HistoryDuos, value, next => Model.HistoryDuos = next); }
+    public int RetainedMatches { get => Model.RetainedMatches; set => Set(Model.RetainedMatches, value, next => Model.RetainedMatches = next); }
     public LobbyDensity LobbyDensity { get => Model.LobbyDensity; set => Set(Model.LobbyDensity, value, next => Model.LobbyDensity = next); }
     public bool ShowCardArt { get => Model.ShowCardArt; set => Set(Model.ShowCardArt, value, next => Model.ShowCardArt = next); }
     public bool AlwaysOnTop { get => Model.AlwaysOnTop; set => Set(Model.AlwaysOnTop, value, next => Model.AlwaysOnTop = next); }

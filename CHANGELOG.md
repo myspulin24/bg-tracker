@@ -10,6 +10,23 @@ zvyšuje, jsou v `documentation.md`, sekce 14.1.
 
 ## [Nevydáno]
 
+## [0.13.0] - 2026-09-05
+
+### Přidáno
+
+- **Historie zápasů** jako nová sekce overlaye: posledních tři až deset zápasů (výchozí pět)
+  s datem, hrdinou (v Duos i spoluhráčem), umístěním, změnou MMR a zůstatkem MMR, přepínač
+  **SOLO / DUOS** a štítek s aktuálním MMR zvoleného režimu. Zápas se zapíše, jakmile hra
+  skončí při běžícím trackeru, a historie přežívá restart i ořez archivu (`history.json`).
+- **MMR** doplňuje uživatel: hra rating do žádného logu nepíše (ověřeno v `Power.log`,
+  `Hearthstone.log`, `GameNetLogger.log`, `LoadingScreen.log`, `Achievements.log` i Unity
+  `Player.log`), a číst paměť procesu hry tracker záměrně nechce. Po zápase se do řádku opíše
+  zůstatek z obrazovky hry a tracker spočítá změnu (`+59`, `−81`) proti předchozímu zápasu
+  téhož režimu i aktuální MMR. Sólo a Duos se nemíchají.
+- Nastavení **Uložené zápasy k přehrání**: kolik dohraných zápasů zůstává v archivu pro
+  Vybrat log, 1 až 200 (dřív napevno pět). Snížení ořeže složku hned.
+- Nastavení **Historie zápasů** a **Zápasů v historii** na stránce Rozložení.
+
 ## [0.12.0] - 2026-09-05
 
 Nový vzhled overlaye a okno nastavení. Všechny dosavadní funkce zůstávají; mění se, jak
@@ -395,7 +412,8 @@ projde celé.
 - Vydání se staví na tag přes GitHub Actions; aplikace si je sama najde, stáhne a
   nainstaluje při dalším startu.
 
-[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.12.0...HEAD
+[Nevydáno]: https://github.com/myspulin24/bg-tracker/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/myspulin24/bg-tracker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/myspulin24/bg-tracker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/myspulin24/bg-tracker/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/myspulin24/bg-tracker/compare/v0.10.0...v0.10.1

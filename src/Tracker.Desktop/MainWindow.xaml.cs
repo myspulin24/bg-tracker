@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private const int LiveDiscoveryIntervalTicks = 15;
 
     private readonly UserSettings settings;
+    private readonly MatchHistory history;
     private readonly MainViewModel viewModel;
     private readonly DispatcherTimer timer;
     private readonly DispatcherTimer saveTimer;
@@ -68,7 +69,10 @@ public partial class MainWindow : Window
         ThemeManager.Apply(settings.Model, Application.Current.Resources);
         InitializeComponent();
 
-        viewModel = new MainViewModel(settings);
+        // Historie zápasů přežívá restart i ořez archivu; ukládá se hned při každé změně.
+        history = MatchHistoryStore.Load(MatchHistoryStore.DefaultPath);
+        history.Changed += (_, _) => SaveHistory();
+        viewModel = new MainViewModel(settings, history);
         DataContext = viewModel;
         Topmost = settings.AlwaysOnTop;
         ApplyDetailsPlacement();
@@ -248,6 +252,13 @@ public partial class MainWindow : Window
             case nameof(UserSettings.AlwaysOnTop):
                 Topmost = settings.AlwaysOnTop;
                 break;
+            case nameof(UserSettings.RetainedMatches):
+                if (matchArchive is not null)
+                {
+                    matchArchive.RetainedMatches = settings.RetainedMatches;
+                }
+
+                break;
         }
 
         if (all)
@@ -270,6 +281,43 @@ public partial class MainWindow : Window
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // Nastavení, které se nedá zapsat, nesmí shodit overlay; platí do konce běhu.
+        }
+    }
+
+    private void SaveHistory()
+    {
+        try
+        {
+            MatchHistoryStore.Save(history, MatchHistoryStore.DefaultPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Historie zůstane aspoň v paměti do konce běhu.
+        }
+    }
+
+    /// <summary>
+    /// Pole MMR v historii: Enter zapíše hodnotu hned, Escape vrátí původní. Bez toho by se
+    /// hodnota uložila až s opuštěním pole, které v overlayi nemá kam odejít.
+    /// </summary>
+    private void HistoryMmr_KeyDown(object sender, KeyEventArgs eventArgs)
+    {
+        if (sender is not TextBox box)
+        {
+            return;
+        }
+
+        if (eventArgs.Key == Key.Enter)
+        {
+            box.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            Keyboard.ClearFocus();
+            eventArgs.Handled = true;
+        }
+        else if (eventArgs.Key == Key.Escape)
+        {
+            box.GetBindingExpression(TextBox.TextProperty)?.UpdateTarget();
+            Keyboard.ClearFocus();
+            eventArgs.Handled = true;
         }
     }
 
@@ -727,7 +775,7 @@ public partial class MainWindow : Window
         matchArchive?.Dispose();
         tracker = new GameStateTracker();
         parser = new PowerLogParser();
-        matchArchive = MatchLogArchive.Open(AppPaths.DataDirectory, path);
+        matchArchive = MatchLogArchive.Open(AppPaths.DataDirectory, path, settings.RetainedMatches);
 
         foreach (var line in matchArchive.ReadActiveLines())
         {
@@ -736,6 +784,8 @@ public partial class MainWindow : Window
 
         if (matchArchive.HasActiveMatch && !tracker.State.IsGameActive)
         {
+            // Zápas dohraný, zatímco tracker neběžel: do historie patří stejně jako živý.
+            MatchRecorder.RecordFinished(tracker.State, matchArchive, history, DateTimeOffset.Now);
             matchArchive.CompleteMatch();
         }
 
@@ -868,7 +918,7 @@ public partial class MainWindow : Window
     private bool HandleLine(string line) => tracker.Apply(parser.Parse(line));
 
     private bool HandleLiveLine(string line) =>
-        MatchRecorder.Handle(parser, tracker, matchArchive, line, DateTimeOffset.Now);
+        MatchRecorder.Handle(parser, tracker, matchArchive, line, DateTimeOffset.Now, history);
 
     /// <summary>
     /// Po restartu hry vznikne nový session adresář a starý `Power.log` se přejmenuje. Bez

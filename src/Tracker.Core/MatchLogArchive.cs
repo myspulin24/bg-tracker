@@ -14,24 +14,26 @@ public sealed class MatchLogArchive : IDisposable
     public const string PlainExtension = ".power.log";
 
     /// <summary>
-    /// Kolik dokončených zápasů se drží. Bez stropu složka roste donekonečna a i zabalený
-    /// zápas má pár megabajtů. Ořez proběhne při každém otevření archivu, takže se složka
-    /// srovná hned po startu aplikace.
+    /// Kolik dokončených zápasů se drží, když uživatel nezvolí jinak. Bez stropu složka roste
+    /// donekonečna a i zabalený zápas má pár megabajtů. Ořez proběhne při každém otevření
+    /// archivu, takže se složka srovná hned po startu aplikace.
     /// </summary>
-    public const int RetainedMatches = 5;
+    public const int DefaultRetainedMatches = 5;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly string checkpointPath;
     private StreamWriter? activeWriter;
     private long savedPosition = -1;
     private string? savedActiveMatchPath;
+    private int retainedMatches;
 
-    private MatchLogArchive(string dataDirectory, string sourcePath)
+    private MatchLogArchive(string dataDirectory, string sourcePath, int retainedMatches)
     {
         DataDirectory = Path.GetFullPath(dataDirectory);
         MatchesDirectory = Path.Combine(DataDirectory, "matches");
         SourcePath = Path.GetFullPath(sourcePath);
         checkpointPath = Path.Combine(DataDirectory, "checkpoint.json");
+        this.retainedMatches = Math.Max(1, retainedMatches);
         Directory.CreateDirectory(MatchesDirectory);
         RestoreCheckpoint();
         PackLeftovers();
@@ -45,7 +47,19 @@ public sealed class MatchLogArchive : IDisposable
     public string? ActiveMatchPath { get; private set; }
     public bool HasActiveMatch => ActiveMatchPath is not null;
 
-    public static MatchLogArchive Open(string dataDirectory, string sourcePath) => new(dataDirectory, sourcePath);
+    /// <summary>Kolik dokončených zápasů se drží. Snížení hned ořeže složku.</summary>
+    public int RetainedMatches
+    {
+        get => retainedMatches;
+        set
+        {
+            retainedMatches = Math.Max(1, value);
+            Prune();
+        }
+    }
+
+    public static MatchLogArchive Open(string dataDirectory, string sourcePath, int retainedMatches = DefaultRetainedMatches) =>
+        new(dataDirectory, sourcePath, retainedMatches);
 
     /// <summary>
     /// Čte zápasový log bez ohledu na to, jestli je zabalený. Volající tak nemusí řešit, kterou
@@ -204,7 +218,7 @@ public sealed class MatchLogArchive : IDisposable
     {
         var finished = Files(PackedExtension)
             .OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase)
-            .Skip(RetainedMatches);
+            .Skip(retainedMatches);
 
         foreach (var path in finished)
         {

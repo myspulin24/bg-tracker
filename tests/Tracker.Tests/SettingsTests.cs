@@ -44,6 +44,10 @@ public sealed class SettingsTests : IDisposable
             ShowEvents = false,
             EventCount = 3,
             ShowMedia = false,
+            ShowHistory = false,
+            HistoryCount = 8,
+            HistoryDuos = true,
+            RetainedMatches = 40,
             LobbyDensity = LobbyDensity.Comfortable,
             ShowCardArt = false,
             AlwaysOnTop = false,
@@ -76,6 +80,10 @@ public sealed class SettingsTests : IDisposable
         Assert.False(loaded.ShowEvents);
         Assert.Equal(3, loaded.EventCount);
         Assert.False(loaded.ShowMedia);
+        Assert.False(loaded.ShowHistory);
+        Assert.Equal(8, loaded.HistoryCount);
+        Assert.True(loaded.HistoryDuos);
+        Assert.Equal(40, loaded.RetainedMatches);
         Assert.Equal(LobbyDensity.Comfortable, loaded.LobbyDensity);
         Assert.False(loaded.ShowCardArt);
         Assert.False(loaded.AlwaysOnTop);
@@ -138,6 +146,8 @@ public sealed class SettingsTests : IDisposable
             Scale = 0.1,
             ScreenShare = 0,
             EventCount = 99,
+            HistoryCount = 99,
+            RetainedMatches = 0,
             WindowLeft = double.NaN,
             HearthstoneDirectory = "   "
         }.Normalized();
@@ -146,6 +156,8 @@ public sealed class SettingsTests : IDisposable
         Assert.Equal(TrackerSettings.MinScale, settings.Scale);
         Assert.Equal(TrackerSettings.MinScreenShare, settings.ScreenShare);
         Assert.Equal(TrackerSettings.MaxEventCount, settings.EventCount);
+        Assert.Equal(TrackerSettings.MaxHistoryCount, settings.HistoryCount);
+        Assert.Equal(TrackerSettings.MinRetainedMatches, settings.RetainedMatches);
         Assert.Null(settings.WindowLeft);
         Assert.Null(settings.HearthstoneDirectory);
     }
